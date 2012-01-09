@@ -25,7 +25,9 @@
  *                                                                           *
  *****************************************************************************/
 
+#include <iostream>
 #include <string>
+#include <dlfcn.h>
 
 #include <dcompile/dcompile.hpp>
 void hoge() {
@@ -37,19 +39,27 @@ int main(int argc, char **argv, char * const *envp) {
 
   std::string source_code = 
   "#include <iostream>\n"
+  "#include <jpeglib.h>\n"
   "void hoge();"
   "extern \"C\" void foo( float *a ) {"
+  "  struct jpeg_compress_struct cinfo;"
   "  std::cout << *a << \" inside\" << std::endl;"
+  "  jpeg_create_compress( &cinfo );"
   "  *a += 0.1f;"
   "  hoge();"
   "}";
-
   dcompile::dynamic_compiler dc;
-  boost::optional< dcompile::library > lib = dc( source_code );
-  if( lib ) {
-    boost::optional< dcompile::function > foo = lib->getFunction( "foo" );
-    if( foo ) {
-      (*foo)( &a );
+  dc.getLoader().enableSystemPath();
+  dc.getHeaderPath().enableSystemPath();
+  if( !dc.getLoader().load( "jpeg" ) ) {
+    std::cout << "unable to load libjpeg." << std::endl;
+  }
+  else {
+    boost::optional< dcompile::module > lib = dc( source_code );
+    if( lib ) {
+      boost::optional< dcompile::function > foo = lib->getFunction( "foo" );
+      if( foo )
+        (*foo)( &a );
     }
   }
   std::cout << a << " outside" << std::endl;

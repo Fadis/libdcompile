@@ -30,6 +30,8 @@
 #include <string>
 #include <vector>
 
+#include <boost/shared_ptr.hpp>
+#include <boost/bind.hpp>
 #include <boost/type_traits.hpp>
 #include <boost/preprocessor.hpp>
 
@@ -50,6 +52,7 @@
 #include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/Support/IRReader.h>
 #include <llvm/Support/SourceMgr.h>
+#include <llvm/Support/DynamicLibrary.h>
 
 #include <clang/Basic/TargetInfo.h>
 #include <clang/Basic/TargetOptions.h>
@@ -63,12 +66,12 @@
 
 namespace dcompile {
   function::function(
-    boost::shared_ptr< llvm::LLVMContext > _llvm_context,
-    boost::shared_ptr< llvm::EngineBuilder > _builder,
-    llvm::ExecutionEngine *_engine,
+    const boost::shared_ptr< llvm::LLVMContext > &_llvm_context,
+    const boost::shared_ptr< llvm::EngineBuilder > &_builder,
+    const boost::shared_ptr< llvm::ExecutionEngine > &_engine,
     llvm::Module *_module,
     llvm::Function *_function
-  ) : llvm_context( _llvm_context ), builder( _builder ), engine( _engine ), module( _module ),
+  ) : context_holder( _llvm_context ), builder( _builder ), engine( _engine ), llvm_module( _module ),
       entry_point( _function ) {}
   void function::operator()() {
     std::vector< llvm::GenericValue > run_args( 0 );
@@ -77,78 +80,147 @@ namespace dcompile {
     llvm::GenericValue Result = engine->runFunction( entry_point, run_args );
   }
 
-  library::library(
+  module::module(
      const boost::shared_ptr< llvm::LLVMContext > &context,
      OptimizeLevel optlevel,
      const boost::shared_ptr< TemporaryFile > &file
-  ) : llvm_context( context ), bc_file( file ) {
+  ) : context_holder( context ), bc_file( file ) {
     llvm::SMDiagnostic Err;
-    module = llvm::ParseIRFile( bc_file->getPath().c_str(), Err, *llvm_context );
-    if (!module) {
-      Err.print( "dcompile::library", llvm::errs());
+    llvm_module = llvm::ParseIRFile( bc_file->getPath().c_str(), Err, *getContext() );
+    if (!llvm_module) {
+      Err.print( "dcompile::module", llvm::errs());
       throw UnableToLoadModule();
     }
     std::string ErrorMsg;
-    if (module->MaterializeAllPermanently(&ErrorMsg)) {
-      llvm::errs() << "dcompile::library" << ": bitcode didn't read correctly.\n";
+    if (llvm_module->MaterializeAllPermanently(&ErrorMsg)) {
+      llvm::errs() << "dcompile::module" << ": bitcode didn't read correctly.\n";
       llvm::errs() << "Reason: " << ErrorMsg << "\n";
       throw UnableToLoadModule();
     }
-    builder.reset( new llvm::EngineBuilder( module ) );
-    builder->setErrorStr(&ErrorMsg);
-    builder->setEngineKind(llvm::EngineKind::JIT);
+    llvm::EngineBuilder *engine_builder = new llvm::EngineBuilder( llvm_module );
+    engine_builder->setErrorStr(&ErrorMsg);
+    engine_builder->setEngineKind(llvm::EngineKind::JIT);
     switch( optlevel ) {
       case None:
-        builder->setOptLevel( llvm::CodeGenOpt::None );
+        engine_builder->setOptLevel( llvm::CodeGenOpt::None );
         break;
       case Less:
-        builder->setOptLevel( llvm::CodeGenOpt::Less );
+        engine_builder->setOptLevel( llvm::CodeGenOpt::Less );
         break;
       case Default:
-        builder->setOptLevel( llvm::CodeGenOpt::Default );
+        engine_builder->setOptLevel( llvm::CodeGenOpt::Default );
         break;
       case Aggressive:
-        builder->setOptLevel( llvm::CodeGenOpt::Aggressive );
+        engine_builder->setOptLevel( llvm::CodeGenOpt::Aggressive );
         break;
       default:
         throw UnknownOptimizeLevel();
     };
-    engine = builder->create();
+    engine.reset( engine_builder->create() );
+    builder.reset( engine_builder, boost::bind( &module::deleteBuilder, _1, engine ) );
     builder->setRelocationModel(llvm::Reloc::Default);
     builder->setCodeModel( llvm::CodeModel::JITDefault );
     builder->setUseMCJIT(true);
     if (!engine) {
       if (!ErrorMsg.empty())
-        llvm::errs() << "dcompile::library" << ": error creating EE: " << ErrorMsg << "\n";
+        llvm::errs() << "dcompile::module" << ": error creating EE: " << ErrorMsg << "\n";
       else
-        llvm::errs() << "dcompile::library" << ": unknown error creating EE!\n";
+        llvm::errs() << "dcompile::module" << ": unknown error creating EE!\n";
       throw UnableToLoadModule();
     }
     engine->RegisterJITEventListener(llvm::createOProfileJITEventListener());
     engine->DisableLazyCompilation(true);
+    engine->runStaticConstructorsDestructors(false);
   }
-  int library::operator()( const std::vector< std::string > &argv, char * const *envp ) {
-    llvm::Function *entry_point = module->getFunction( "main" );
+  int module::operator()( const std::vector< std::string > &argv, char * const *envp ) {
+    llvm::Function *entry_point = llvm_module->getFunction( "main" );
     return engine->runFunctionAsMain( entry_point, argv, envp );
   }
-  boost::optional< function > library::getFunction( const std::string &name ) {
-    llvm::Function *entry_point = module->getFunction( name.c_str() );
+  boost::optional< function > module::getFunction( const std::string &name ) {
+    llvm::Function *entry_point = llvm_module->getFunction( name.c_str() );
     if( !entry_point )
       return boost::optional< function >();
-    return function( llvm_context, builder, engine, module, entry_point );
+    return function( getContext(), builder, engine, llvm_module, entry_point );
+  }
+  void module::deleteBuilder( llvm::EngineBuilder *builder, boost::shared_ptr< llvm::ExecutionEngine > engine ) {
+    engine->runStaticConstructorsDestructors(true);
+    delete builder;
+  }
+  loader::loader( const boost::shared_ptr< llvm::LLVMContext > &_context ) : context_holder( _context ), enable_system_path( false ) {
+  }
+  void loader::enableSystemPath( bool flag ) {
+    enable_system_path = flag;
+    if( enable_system_path && system_path.empty() ) {
+      std::vector< llvm::sys::Path > llvm_system_path;
+      llvm::sys::Path::GetSystemLibraryPaths ( llvm_system_path );
+      system_path.reserve( llvm_system_path.size() );
+      for(
+        std::vector< llvm::sys::Path >::const_iterator iter = llvm_system_path.begin();
+        iter != llvm_system_path.end();
+        ++iter
+      ) system_path.push_back( boost::filesystem::path( iter->c_str() ) );
+    }
+  }
+  bool loader::load( const std::string &name ) const {
+    boost::optional< boost::filesystem::path > path = findLib( name );
+    if( path )
+      return !llvm::sys::DynamicLibrary::LoadLibraryPermanently( path->c_str() );
+    else
+      return false;
+  }
+  boost::optional< boost::filesystem::path > loader::findLib( const std::string &name ) const {
+    llvm::sys::Path llvm_path;
+    llvm_path.set( name.c_str() );
+    if ( llvm_path.isDynamicLibrary() || llvm_path.isBitcodeFile() )
+      return boost::filesystem::path( name );
+    for(
+      boost::unordered_set< boost::filesystem::path >::const_iterator iter = user_path.begin();
+      iter != user_path.end();
+      ++iter
+    ) {
+      boost::optional< boost::filesystem::path > path = findLibInDirectory( name, *iter );
+      if( path )
+        return path;
+    }
+    if( enable_system_path ) {
+      for(
+        std::vector< boost::filesystem::path >::const_iterator iter = system_path.begin();
+        iter != system_path.end();
+        ++iter
+      ) {
+        boost::optional< boost::filesystem::path > path = findLibInDirectory( name, *iter );
+        if( path )
+          return path;
+      }
+    }
+    return boost::optional< boost::filesystem::path >();
+  }
+  boost::optional< boost::filesystem::path > loader::findLibInDirectory( const std::string &name, const boost::filesystem::path &path ) const {
+    llvm::sys::Path llvm_path;
+    llvm_path.set( path.c_str() );
+    llvm_path.appendComponent( "lib" + name );
+    llvm_path.appendSuffix( llvm::sys::Path::GetDLLSuffix() );
+    if ( llvm_path.isDynamicLibrary() || llvm_path.isBitcodeFile() )
+      return boost::filesystem::path( llvm_path.c_str() );
+    llvm_path.eraseSuffix();
+    if ( llvm_path.isDynamicLibrary() || llvm_path.isBitcodeFile() )
+      return boost::filesystem::path( llvm_path.c_str() );
+    return boost::optional< boost::filesystem::path >();
   }
   dynamic_compiler::dynamic_compiler()
   : resource_directory( boost::filesystem::path( BOOST_PP_STRINGIZE( RESOURCE_DIRECTORY ) ) / CLANG_VERSION_STRING ),
-    llvm_context( new llvm::LLVMContext ), optlevel( Aggressive ) {}
+    optlevel( Aggressive ), library_loader( getContext() ) {
+    }
   dynamic_compiler::dynamic_compiler( const boost::filesystem::path &resource )
-  : resource_directory( resource ), llvm_context( new llvm::LLVMContext ), optlevel( Aggressive ) {}
+  : resource_directory( resource ), library_loader( getContext() ), optlevel( Aggressive ) {
+  }
   void dynamic_compiler::setOptimizeLevel( OptimizeLevel new_level ) {
     optlevel = new_level;
   }
   OptimizeLevel dynamic_compiler::getOptimizeLevel() const {
     return optlevel;
   }
-  library dynamic_compiler::operator()( const std::string &source_code ) {
+  module dynamic_compiler::operator()( const std::string &source_code ) {
     TemporaryFile source_file_name( 64, ".cpp" );
     boost::shared_ptr< TemporaryFile > bc_file_name( new TemporaryFile( 64, ".bc" ) );
     {
@@ -173,6 +245,16 @@ namespace dcompile {
       default:
         throw UnknownOptimizeLevel();
     };
+    if( !header.includeSystemPath() )
+      arguments.push_back( "-nostdsysteminc" );
+    for(
+      boost::unordered_set< boost::filesystem::path >::const_iterator iter = header.getPath().begin();
+      iter != header.getPath().end();
+      ++iter
+    ) {
+      arguments.push_back( "-I" );
+      arguments.push_back( iter->string() );
+    }
     arguments.push_back( source_file_name.getPath().string() );
     arguments.push_back( "-o" );
     arguments.push_back( bc_file_name->getPath().string() );
@@ -195,21 +277,16 @@ namespace dcompile {
       compiler.getDiagnostics()
     );
 
-    llvm::Triple target_triple;
-    target_triple.setArch(llvm::Triple::x86_64);
-    target_triple.setVendor(llvm::Triple::Apple);
-    target_triple.setOS(llvm::Triple::Darwin);
-
     clang::TargetOptions target_opts;
-    target_opts.Triple = target_triple.getTriple();
+    target_opts.Triple = LLVM_DEFAULT_TARGET_TRIPLE;
     compiler.setTarget( clang::TargetInfo::CreateTargetInfo(
                         compiler.getDiagnostics(),
                         target_opts
                     ) );
-    clang::EmitBCAction action( llvm_context.get() );
+    clang::EmitBCAction action( getContext().get() );
 
     compiler.ExecuteAction ( action );
-    library lib( llvm_context, optlevel, bc_file_name );
+    module lib( getContext(), optlevel, bc_file_name );
     return lib;
   }
 }

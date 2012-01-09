@@ -7,7 +7,7 @@ INCLUDE (CheckIncludeFiles)
 include (FindPkgConfig)
 
 # build type
-set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_BUILD_TYPE Debug)
 
 # compile option (Debug) 
 set(CMAKE_CXX_FLAGS_DEBUG "-g")

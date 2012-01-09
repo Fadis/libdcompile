@@ -34,6 +34,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/type_traits.hpp>
 #include <boost/preprocessor.hpp>
+#include <boost/unordered_set.hpp>
 
 #include <llvm/Support/Host.h>
 #include <llvm/Support/Path.h>
@@ -73,6 +74,20 @@ namespace dcompile {
     Aggressive
   };
 
+  class context_holder {
+  public:
+    context_holder() : llvm_context( new llvm::LLVMContext ) {
+    }
+    context_holder( const boost::shared_ptr< llvm::LLVMContext > &context ) : llvm_context( context ) {
+    }
+  protected:
+    const boost::shared_ptr< llvm::LLVMContext > &getContext() const {
+      return llvm_context;
+    }
+  private:
+    boost::shared_ptr< llvm::LLVMContext > llvm_context;
+  };
+  
   template< typename Type >
   void setParam( llvm::GenericValue &_dest, Type value,
                  typename boost::enable_if< boost::mpl::bool_<
@@ -113,12 +128,12 @@ namespace dcompile {
       throw InvalidArgument();
   }
 
-  class function {
+  class function : public context_holder {
   public:
     function(
-      boost::shared_ptr< llvm::LLVMContext > _llvm_context,
-      boost::shared_ptr< llvm::EngineBuilder > _builder,
-      llvm::ExecutionEngine *_engine,
+      const boost::shared_ptr< llvm::LLVMContext > &_llvm_context,
+      const boost::shared_ptr< llvm::EngineBuilder > &_builder,
+      const boost::shared_ptr< llvm::ExecutionEngine > &_engine,
       llvm::Module *_module,
       llvm::Function *_function
     );
@@ -146,16 +161,14 @@ namespace dcompile {
     BOOST_PP_REPEAT_FROM_TO( 1, 20, DCOMPILE_FUNCTION_CALL_EACH, )
 
   private:
-    boost::shared_ptr< llvm::LLVMContext > llvm_context;
     boost::shared_ptr< llvm::EngineBuilder > builder;
-    llvm::Module *module;
-    llvm::ExecutionEngine *engine;
+    llvm::Module *llvm_module;
+    boost::shared_ptr< llvm::ExecutionEngine > engine;
     llvm::Function *entry_point;
   };
-
-  class library {
+  class module : public context_holder {
   public:
-    library(
+    module(
       const boost::shared_ptr< llvm::LLVMContext > &context,
       OptimizeLevel optlevel,
       const boost::shared_ptr< dcompile::TemporaryFile > &file
@@ -163,21 +176,91 @@ namespace dcompile {
     int operator()( const std::vector< std::string > &argv, char * const *envp );
     boost::optional< function > getFunction( const std::string &name );
   private:
-    boost::shared_ptr< llvm::LLVMContext > llvm_context;
+    static void deleteBuilder( llvm::EngineBuilder *builder, boost::shared_ptr< llvm::ExecutionEngine > engine );
     boost::shared_ptr< dcompile::TemporaryFile > bc_file;
     boost::shared_ptr< llvm::EngineBuilder > builder;
-    llvm::Module *module;
-    llvm::ExecutionEngine *engine;
+    llvm::Module *llvm_module;
+    boost::shared_ptr< llvm::ExecutionEngine > engine;
   };
 
-  class dynamic_compiler {
+  class loader : public context_holder {
+  public:
+    loader( const boost::shared_ptr< llvm::LLVMContext > &_context );
+    bool load( const std::string &name ) const;
+    boost::optional< boost::filesystem::path > findLib( const std::string &name ) const;
+    boost::optional< boost::filesystem::path > findLibInDirectory( const std::string &name, const boost::filesystem::path &path ) const;
+    void enableSystemPath( bool flag = true );
+    void disableSystemPath( bool flag = true ) {
+      enableSystemPath( !flag );
+    }
+    void addPath( const boost::filesystem::path path ) {
+      user_path.insert( path );
+    }
+    void delPath( const boost::filesystem::path path ) {
+      user_path.erase( path );
+    }
+    boost::unordered_set< boost::filesystem::path > &getPath() {
+      return user_path;
+    }
+    const boost::unordered_set< boost::filesystem::path > &getPath() const {
+      return user_path;
+    }
+  private:
+    boost::unordered_set< boost::filesystem::path > user_path;
+    std::vector< boost::filesystem::path > system_path;
+    bool enable_system_path;
+  };
+  class header_path {
+  public:
+    header_path() : enable_system_path( false ) {
+    }
+    void enableSystemPath( bool flag = true ) {
+      enable_system_path = flag;
+    }
+    void disableSystemPath( bool flag = true ) {
+      enableSystemPath( !flag );
+    }
+    bool includeSystemPath() const {
+      return enable_system_path;
+    }
+    void addPath( const boost::filesystem::path path ) {
+      user_path.insert( path );
+    }
+    void delPath( const boost::filesystem::path path ) {
+      user_path.erase( path );
+    }
+    boost::unordered_set< boost::filesystem::path > &getPath() {
+      return user_path;
+    }
+    const boost::unordered_set< boost::filesystem::path > &getPath() const {
+      return user_path;
+    }
+  private:
+    boost::unordered_set< boost::filesystem::path > user_path;
+    bool enable_system_path;
+  };
+  class dynamic_compiler : public context_holder {
   public:
     dynamic_compiler();
     dynamic_compiler( const boost::filesystem::path &resource );
     void setOptimizeLevel( OptimizeLevel new_level );
     OptimizeLevel getOptimizeLevel() const;
-    library operator()( const std::string &source_code );
+    loader &getLoader() {
+      return library_loader;
+    }
+    const loader &getLoader() const {
+      return library_loader;
+    }
+    header_path &getHeaderPath() {
+      return header;
+    }
+    const header_path &getHeaderPath() const {
+      return header;
+    }
+    module operator()( const std::string &source_code );
   private:
+    header_path header;
+    loader library_loader;
     OptimizeLevel optlevel;
     boost::shared_ptr< llvm::LLVMContext > llvm_context;
     clang::CompilerInstance compiler;
