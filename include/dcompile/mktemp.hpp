@@ -28,6 +28,8 @@
 #ifndef DCOMPILE_MKTEMP_HPP
 #define DCOMPILE_MKTEMP_HPP
 
+#include <dcompile/exceptions.hpp>
+
 #include <string>
 #include <fstream>
 #include <boost/thread/thread.hpp>
@@ -35,8 +37,6 @@
 #include <boost/filesystem/operations.hpp>
 
 namespace dcompile {
-  struct UnableToCreateUniqueFile {};
-
   template< typename CharType >
   boost::filesystem::path temp_file_path( int length, const std::basic_string< CharType > &prefix, const std::basic_string< CharType > &postfix ) {
     std::string filename_template;

@@ -25,5 +25,46 @@
  *                                                                           *
  *****************************************************************************/
 
+#ifndef DCOMPILE_MODULE_HPP
+#define DCOMPILE_MODULE_HPP
+
+#include <string>
+#include <vector>
+
+#include <dcompile/common.hpp>
+#include <dcompile/context_holder.hpp>
+#include <dcompile/function.hpp>
+#include <dcompile/mktemp.hpp>
+
+#include <boost/shared_ptr.hpp>
+#include <boost/optional.hpp>
+
+#include <llvm/LLVMContext.h>
+#include <llvm/Module.h>
+#include <llvm/Function.h>
+#include <llvm/DerivedTypes.h>
+
+#include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include <llvm/ExecutionEngine/GenericValue.h>
+
+
 namespace dcompile {
+  class module : public context_holder {
+  public:
+    module(
+      const boost::shared_ptr< llvm::LLVMContext > &context,
+      OptimizeLevel optlevel,
+      const boost::shared_ptr< dcompile::TemporaryFile > &file
+    );
+    int operator()( const std::vector< std::string > &argv, char * const *envp );
+    boost::optional< function > getFunction( const std::string &name );
+  private:
+    static void deleteBuilder( llvm::EngineBuilder *builder, boost::shared_ptr< llvm::ExecutionEngine > engine );
+    boost::shared_ptr< dcompile::TemporaryFile > bc_file;
+    boost::shared_ptr< llvm::EngineBuilder > builder;
+    llvm::Module *llvm_module;
+    boost::shared_ptr< llvm::ExecutionEngine > engine;
+  };
 }
+
+#endif

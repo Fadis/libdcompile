@@ -25,5 +25,53 @@
  *                                                                           *
  *****************************************************************************/
 
+#ifndef DCOMPILE_DYNAMIC_COMPILER_HPP
+#define DCOMPILE_DYNAMIC_COMPILER_HPP
+
+#include <string>
+
+#include <dcompile/common.hpp>
+#include <dcompile/context_holder.hpp>
+#include <dcompile/module.hpp>
+#include <dcompile/loader.hpp>
+#include <dcompile/header_path.hpp>
+
+#include <boost/shared_ptr.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/type_traits.hpp>
+
+#include <llvm/LLVMContext.h>
+
+#include <clang/Frontend/CompilerInstance.h>
+
 namespace dcompile {
+  class dynamic_compiler : public context_holder {
+  public:
+    dynamic_compiler();
+    dynamic_compiler( const boost::filesystem::path &resource );
+    void setOptimizeLevel( OptimizeLevel new_level );
+    OptimizeLevel getOptimizeLevel() const;
+    loader &getLoader() {
+      return library_loader;
+    }
+    const loader &getLoader() const {
+      return library_loader;
+    }
+    header_path &getHeaderPath() {
+      return header;
+    }
+    const header_path &getHeaderPath() const {
+      return header;
+    }
+    module operator()( const std::string &source_code );
+  private:
+    const boost::filesystem::path resource_directory;
+    header_path header;
+    loader library_loader;
+    OptimizeLevel optlevel;
+    boost::shared_ptr< llvm::LLVMContext > llvm_context;
+    clang::CompilerInstance compiler;
+  };
 }
+
+#endif

@@ -7,7 +7,7 @@ INCLUDE (CheckIncludeFiles)
 include (FindPkgConfig)
 
 # build type
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 
 # compile option (Debug) 
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
@@ -18,7 +18,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "-W -Wall -O3")
 set(CMAKE_C_FLAGS_RELEASE "-W -Wall -O3")
 
 #if you don't want the full compiler output, remove the following line
-set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_VERBOSE_MAKEFILE OFF)
 
 set(Boost_USE_MULTITHREADED ON)
 find_package(Boost 1.42.0 COMPONENTS thread filesystem system REQUIRED )
@@ -40,4 +40,4 @@ INCLUDE_DIRECTORIES( ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_BINARY_
 LINK_DIRECTORIES( ${LLVM_LIB_DIR} )
 SET( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LLVM_COMPILE_FLAGS}" )
 SET( CMAKE_LD_FLAGS "${CMAKE_LD_FLAGS} ${LLVM_LIBS}" )
-subdirs( src )
+subdirs( include src )

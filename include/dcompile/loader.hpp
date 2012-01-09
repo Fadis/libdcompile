@@ -25,5 +25,49 @@
  *                                                                           *
  *****************************************************************************/
 
+#ifndef DCOMPILE_LOADER_HPP
+#define DCOMPILE_LOADER_HPP
+
+#include <string>
+#include <vector>
+
+#include <dcompile/context_holder.hpp>
+
+#include <boost/shared_ptr.hpp>
+#include <boost/optional.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/unordered_set.hpp>
+
+#include <llvm/LLVMContext.h>
+
 namespace dcompile {
+  class loader : public context_holder {
+  public:
+    loader( const boost::shared_ptr< llvm::LLVMContext > &_context );
+    bool load( const std::string &name ) const;
+    boost::optional< boost::filesystem::path > findLib( const std::string &name ) const;
+    boost::optional< boost::filesystem::path > findLibInDirectory( const std::string &name, const boost::filesystem::path &path ) const;
+    void enableSystemPath( bool flag = true );
+    void disableSystemPath( bool flag = true ) {
+      enableSystemPath( !flag );
+    }
+    void addPath( const boost::filesystem::path &path ) {
+      user_path.insert( path );
+    }
+    void delPath( const boost::filesystem::path &path ) {
+      user_path.erase( path );
+    }
+    boost::unordered_set< boost::filesystem::path > &getPath() {
+      return user_path;
+    }
+    const boost::unordered_set< boost::filesystem::path > &getPath() const {
+      return user_path;
+    }
+  private:
+    boost::unordered_set< boost::filesystem::path > user_path;
+    std::vector< boost::filesystem::path > system_path;
+    bool enable_system_path;
+  };
 }
+
+#endif

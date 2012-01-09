@@ -27,14 +27,13 @@
 
 #include <iostream>
 #include <string>
-#include <dlfcn.h>
 
 #include <dcompile/dcompile.hpp>
 void hoge() {
   std::cout << "moo" << std::endl;
 }
 
-int main(int argc, char **argv, char * const *envp) {
+int main() {
   float a = 5.0f;
 
   std::string source_code = 

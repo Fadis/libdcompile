@@ -25,5 +25,14 @@
  *                                                                           *
  *****************************************************************************/
 
+#ifndef DCOMPILE_EXCEPTIONS_HPP
+#define DCOMPILE_EXCEPTIONS_HPP
+
 namespace dcompile {
+  class UnableToLoadModule {};
+  class UnknownOptimizeLevel {};
+  class InvalidArgument {};
+  class UnableToCreateUniqueFile {};
 }
+
+#endif

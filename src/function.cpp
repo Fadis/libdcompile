@@ -25,5 +25,34 @@
  *                                                                           *
  *****************************************************************************/
 
+#include <dcompile/exceptions.hpp>
+#include <dcompile/context_holder.hpp>
+#include <dcompile/function.hpp>
+
+#include <vector>
+
+#include <boost/shared_ptr.hpp>
+
+#include <llvm/LLVMContext.h>
+#include <llvm/Module.h>
+#include <llvm/Function.h>
+#include <llvm/DerivedTypes.h>
+#include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include <llvm/ExecutionEngine/GenericValue.h>
+
 namespace dcompile {
+  function::function(
+    const boost::shared_ptr< llvm::LLVMContext > &_llvm_context,
+    const boost::shared_ptr< llvm::EngineBuilder > &_builder,
+    const boost::shared_ptr< llvm::ExecutionEngine > &_engine,
+    llvm::Module *_module,
+    llvm::Function *_function
+  ) : context_holder( _llvm_context ), builder( _builder ), engine( _engine ), llvm_module( _module ),
+      entry_point( _function ) {}
+  void function::operator()() {
+    std::vector< llvm::GenericValue > run_args( 0 );
+    if( entry_point->getFunctionType()->getNumParams() != 0 )
+      throw InvalidArgument();
+    llvm::GenericValue Result = engine->runFunction( entry_point, run_args );
+  }
 }

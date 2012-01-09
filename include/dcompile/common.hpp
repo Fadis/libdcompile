@@ -25,5 +25,16 @@
  *                                                                           *
  *****************************************************************************/
 
+#ifndef DCOMPILE_COMMON_HPP
+#define DCOMPILE_COMMON_HPP
+
 namespace dcompile {
+  enum OptimizeLevel {
+    None,
+    Less,
+    Default,
+    Aggressive
+  };
 }
+
+#endif

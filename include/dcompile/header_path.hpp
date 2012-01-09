@@ -25,5 +25,43 @@
  *                                                                           *
  *****************************************************************************/
 
+#ifndef DCOMPILE_HEADER_PATH_HPP
+#define DCOMPILE_HEADER_PATH_HPP
+
+#include <string>
+
+#include <boost/unordered_set.hpp>
+
 namespace dcompile {
+  class header_path {
+  public:
+    header_path() : enable_system_path( false ) {
+    }
+    void enableSystemPath( bool flag = true ) {
+      enable_system_path = flag;
+    }
+    void disableSystemPath( bool flag = true ) {
+      enableSystemPath( !flag );
+    }
+    bool includeSystemPath() const {
+      return enable_system_path;
+    }
+    void addPath( const boost::filesystem::path &path ) {
+      user_path.insert( path );
+    }
+    void delPath( const boost::filesystem::path &path ) {
+      user_path.erase( path );
+    }
+    boost::unordered_set< boost::filesystem::path > &getPath() {
+      return user_path;
+    }
+    const boost::unordered_set< boost::filesystem::path > &getPath() const {
+      return user_path;
+    }
+  private:
+    boost::unordered_set< boost::filesystem::path > user_path;
+    bool enable_system_path;
+  };
 }
+
+#endif

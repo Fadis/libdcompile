@@ -25,5 +25,27 @@
  *                                                                           *
  *****************************************************************************/
 
+#ifndef DCOMPILE_CONTEXT_HOLDER_HPP
+#define DCOMPILE_CONTEXT_HOLDER_HPP
+
+#include <boost/shared_ptr.hpp>
+
+#include <llvm/LLVMContext.h>
+
 namespace dcompile {
+  class context_holder {
+  public:
+    context_holder() : llvm_context( new llvm::LLVMContext ) {
+    }
+    context_holder( const boost::shared_ptr< llvm::LLVMContext > &context ) : llvm_context( context ) {
+    }
+  protected:
+    const boost::shared_ptr< llvm::LLVMContext > &getContext() const {
+      return llvm_context;
+    }
+  private:
+    boost::shared_ptr< llvm::LLVMContext > llvm_context;
+  };
 }
+
+#endif
