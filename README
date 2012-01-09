@@ -1,0 +1,13 @@
+libdcompile is a C++ library to compile and execute C++ code in runtime.
+
+Requirements
+LLVM 3.1 ( http://llvm.org/ ) compiled with Clang ( http://clang.llvm.org/ )
+libjpeg ( http://www.ijg.org/ ) ( only used in sample program )
+
+Installation
+$ git clone git://github.com/Fadis/libdcompile.git
+$ mkdir build
+$ cd build
+$ cmake ../libdcompile -DCMAKE_INSTALL_PREFIX=<prefix>
+$ make
+$ make insetll
