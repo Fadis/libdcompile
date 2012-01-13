@@ -54,7 +54,9 @@ int main() {
     std::cout << "unable to load libjpeg." << std::endl;
   }
   else {
-    boost::optional< dcompile::module > lib = dc( source_code );
+    std::cout << dc.dumpLLVM( source_code, dcompile::CXX ) << std::endl;
+    std::cout << dc.dumpAsm( source_code, dcompile::CXX ) << std::endl;
+    boost::optional< dcompile::module > lib = dc( source_code, dcompile::CXX );
     if( lib ) {
       boost::optional< dcompile::function > foo = lib->getFunction( "foo" );
       if( foo )

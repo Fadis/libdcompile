@@ -33,9 +33,11 @@
 #include <dcompile/function.hpp>
 #include <dcompile/mktemp.hpp>
 #include <dcompile/module.hpp>
+#include <dcompile/native_target.hpp>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/optional.hpp>
+#include <boost/thread.hpp>
 
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/LLVMContext.h>
@@ -57,6 +59,7 @@ namespace dcompile {
      OptimizeLevel optlevel,
      const boost::shared_ptr< TemporaryFile > &file
   ) : context_holder( context ), bc_file( file ) {
+    native_target::init();
     llvm::SMDiagnostic Err;
     llvm_module = llvm::ParseIRFile( bc_file->getPath().c_str(), Err, *getContext() );
     if (!llvm_module) {

@@ -25,46 +25,37 @@
  *                                                                           *
  *****************************************************************************/
 
-#ifndef DCOMPILE_MODULE_HPP
-#define DCOMPILE_MODULE_HPP
+#ifndef DCOMPILE_NATIVE_TARGET_HPP
+#define DCOMPILE_NATIVE_TARGET_HPP
 
-#include <string>
-#include <vector>
-
-#include <dcompile/common.hpp>
-#include <dcompile/context_holder.hpp>
-#include <dcompile/function.hpp>
-#include <dcompile/mktemp.hpp>
-
-#include <boost/shared_ptr.hpp>
-#include <boost/optional.hpp>
 #include <boost/thread.hpp>
 
-#include <llvm/LLVMContext.h>
-#include <llvm/Module.h>
-#include <llvm/Function.h>
-#include <llvm/DerivedTypes.h>
-
-#include <llvm/ExecutionEngine/ExecutionEngine.h>
-#include <llvm/ExecutionEngine/GenericValue.h>
-
+#include <llvm/Support/TargetSelect.h>
 
 namespace dcompile {
-  class module : public context_holder {
+  class native_target {
   public:
-    module(
-      const boost::shared_ptr< llvm::LLVMContext > &context,
-      OptimizeLevel optlevel,
-      const boost::shared_ptr< dcompile::TemporaryFile > &file
-    );
-    int operator()( const std::vector< std::string > &argv, char * const *envp );
-    boost::optional< function > getFunction( const std::string &name );
+    static void init() {
+      get();
+    }
+    static native_target &get() {
+      static boost::mutex singleton_lock;
+      static native_target *instance;
+      boost::mutex::scoped_lock lock ( singleton_lock );
+      if ( !instance ) {
+        instance = getNonThreadSafe();
+      }
+      return *instance;
+    }
   private:
-    static void deleteBuilder( llvm::EngineBuilder *builder, boost::shared_ptr< llvm::ExecutionEngine > engine );
-    boost::shared_ptr< dcompile::TemporaryFile > bc_file;
-    boost::shared_ptr< llvm::EngineBuilder > builder;
-    llvm::Module *llvm_module;
-    boost::shared_ptr< llvm::ExecutionEngine > engine;
+    static native_target *getNonThreadSafe() {
+      static native_target singleton;
+      return &singleton;
+    }
+    native_target() {
+      llvm::InitializeNativeTarget();
+      llvm::InitializeNativeTargetAsmPrinter();
+    }
   };
 }
 

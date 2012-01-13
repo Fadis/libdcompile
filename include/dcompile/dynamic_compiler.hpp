@@ -63,14 +63,18 @@ namespace dcompile {
     const header_path &getHeaderPath() const {
       return header;
     }
-    module operator()( const std::string &source_code );
+    module operator()( const std::string &source_code, Language lang = CXX ) const;
+    std::string dumpLLVM( const std::string &source_code, Language lang = CXX ) const;
+    std::string dumpAsm( const std::string &source_code, Language lang = CXX ) const;
   private:
+    void buildArguments( std::vector< std::string > &arguments, const boost::filesystem::path &_from, const boost::filesystem::path &_to ) const;
+    void setupCompiler( clang::CompilerInstance &compiler, const boost::filesystem::path &_from, const boost::filesystem::path &_to ) const;
     const boost::filesystem::path resource_directory;
     header_path header;
     loader library_loader;
     OptimizeLevel optlevel;
     boost::shared_ptr< llvm::LLVMContext > llvm_context;
-    clang::CompilerInstance compiler;
+      //    clang::CompilerInstance compiler;
   };
 }
 

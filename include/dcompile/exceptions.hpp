@@ -33,6 +33,7 @@ namespace dcompile {
   class UnknownOptimizeLevel {};
   class InvalidArgument {};
   class UnableToCreateUniqueFile {};
+  class UnsupportedLanguage {};
 }
 
 #endif

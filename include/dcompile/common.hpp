@@ -35,6 +35,14 @@ namespace dcompile {
     Default,
     Aggressive
   };
+  enum Language {
+    CXX,
+    ObjC,
+    C,
+    CUDA,
+    OpenCL
+  };
+  const char *getFileSuffix( Language lang );
 }
 
 #endif
