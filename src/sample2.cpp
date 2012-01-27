@@ -25,53 +25,36 @@
  *                                                                           *
  *****************************************************************************/
 
-#ifndef DCOMPILE_MODULE_HPP
-#define DCOMPILE_MODULE_HPP
-
+#include <iostream>
 #include <string>
-#include <vector>
 
-#include <dcompile/common.hpp>
-#include <dcompile/context_holder.hpp>
-#include <dcompile/function.hpp>
-#include <dcompile/mktemp.hpp>
-
-#include <boost/shared_ptr.hpp>
-#include <boost/optional.hpp>
-#include <boost/thread.hpp>
-#include <boost/utility/enable_if.hpp>
-
-#include <llvm/LLVMContext.h>
-#include <llvm/Module.h>
-#include <llvm/Function.h>
-#include <llvm/DerivedTypes.h>
-
-#include <llvm/ExecutionEngine/ExecutionEngine.h>
-#include <llvm/ExecutionEngine/GenericValue.h>
-
-
-namespace dcompile {
-  class module : public context_holder {
-  public:
-    module(
-      const boost::shared_ptr< llvm::LLVMContext > &context,
-      OptimizeLevel optlevel,
-      const boost::shared_ptr< dcompile::TemporaryFile > &file
-    );
-    module(
-      const boost::shared_ptr< llvm::LLVMContext > &context,
-      OptimizeLevel optlevel,
-      llvm::Module *_module
-    );
-    int operator()( const std::vector< std::string > &argv, char * const *envp );
-    boost::optional< function > getFunction( const std::string &name );
-  private:
-    static void deleteBuilder( llvm::EngineBuilder *builder, boost::shared_ptr< llvm::ExecutionEngine > engine );
-    boost::shared_ptr< dcompile::TemporaryFile > bc_file;
-    boost::shared_ptr< llvm::EngineBuilder > builder;
-    llvm::Module *llvm_module;
-    boost::shared_ptr< llvm::ExecutionEngine > engine;
-  };
+#include <dcompile/dcompile.hpp>
+void hoge() {
+  std::cout << "moo" << std::endl;
 }
 
-#endif
+int main() {
+  float a[] = { 1.0f, 2.0f, 3.0f, 4.0f };
+
+  std::string source_code = 
+  "typedef float float1 __attribute__((ext_vector_type(1)));"
+  "typedef float float2 __attribute__((ext_vector_type(2)));"
+  "typedef float float3 __attribute__((ext_vector_type(3)));"
+  "typedef float float4 __attribute__((ext_vector_type(4)));"
+  "extern \"C\" void foo( float *a ) {"
+  "  float4 p = { 0.1f, 0.2f, 0.3f, 0.4f };"
+  "  a[ 0 ] = p.x + p.y + p.z + p.w;"
+  "}";
+  dcompile::dynamic_compiler dc;
+  dc.getLoader().enableSystemPath();
+  dc.getHeaderPath().enableSystemPath();
+  std::cout << dc.dumpAsm( source_code, dcompile::CXX ) << std::endl;
+  boost::optional< dcompile::module > lib = dc( source_code, dcompile::CXX );
+  if( lib ) {
+    boost::optional< dcompile::function > foo = lib->getFunction( "foo" );
+    if( foo )
+      (*foo)( &a );
+  }
+  std::cout << a[0] << " " << a[1] << " " << a[2] << " " << a[3] << std::endl;
+}
+

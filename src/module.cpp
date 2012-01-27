@@ -107,6 +107,53 @@ namespace dcompile {
     engine->DisableLazyCompilation(true);
     engine->runStaticConstructorsDestructors(false);
   }
+  module::module(
+    const boost::shared_ptr< llvm::LLVMContext > &context,
+    OptimizeLevel optlevel,
+    llvm::Module *_module
+  ) : context_holder( context ), llvm_module( _module ) {
+    native_target::init();
+    std::string ErrorMsg;
+    if (llvm_module->MaterializeAllPermanently(&ErrorMsg)) {
+      llvm::errs() << "dcompile::module" << ": bitcode didn't read correctly.\n";
+      llvm::errs() << "Reason: " << ErrorMsg << "\n";
+      throw UnableToLoadModule();
+    }
+    llvm::EngineBuilder *engine_builder = new llvm::EngineBuilder( llvm_module );
+    engine_builder->setErrorStr(&ErrorMsg);
+    engine_builder->setEngineKind(llvm::EngineKind::JIT);
+    switch( optlevel ) {
+      case None:
+        engine_builder->setOptLevel( llvm::CodeGenOpt::None );
+        break;
+      case Less:
+        engine_builder->setOptLevel( llvm::CodeGenOpt::Less );
+        break;
+      case Default:
+        engine_builder->setOptLevel( llvm::CodeGenOpt::Default );
+        break;
+      case Aggressive:
+        engine_builder->setOptLevel( llvm::CodeGenOpt::Aggressive );
+        break;
+      default:
+        throw UnknownOptimizeLevel();
+    };
+    engine.reset( engine_builder->create() );
+    builder.reset( engine_builder, boost::bind( &module::deleteBuilder, _1, engine ) );
+    builder->setRelocationModel(llvm::Reloc::Default);
+    builder->setCodeModel( llvm::CodeModel::JITDefault );
+    builder->setUseMCJIT(true);
+    if (!engine) {
+      if (!ErrorMsg.empty())
+        llvm::errs() << "dcompile::module" << ": error creating EE: " << ErrorMsg << "\n";
+      else
+        llvm::errs() << "dcompile::module" << ": unknown error creating EE!\n";
+      throw UnableToLoadModule();
+    }
+    engine->RegisterJITEventListener(llvm::createOProfileJITEventListener());
+    engine->DisableLazyCompilation(true);
+    engine->runStaticConstructorsDestructors(false);
+  }
   int module::operator()( const std::vector< std::string > &argv, char * const *envp ) {
     llvm::Function *entry_point = llvm_module->getFunction( "main" );
     return engine->runFunctionAsMain( entry_point, argv, envp );

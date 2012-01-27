@@ -68,7 +68,7 @@ namespace dcompile {
   OptimizeLevel dynamic_compiler::getOptimizeLevel() const {
     return optlevel;
   }
-  void dynamic_compiler::buildArguments( std::vector< std::string > &arguments, const boost::filesystem::path &_from, const boost::filesystem::path &_to ) const {
+  void dynamic_compiler::buildArguments( std::vector< std::string > &arguments ) const {
     arguments.push_back( "dcompile" );
     switch( optlevel ) {
       case None:
@@ -96,18 +96,19 @@ namespace dcompile {
       arguments.push_back( "-I" );
       arguments.push_back( iter->string() );
     }
+    arguments.push_back( "-resource-dir" );
+    arguments.push_back( resource_directory.string() );
+  }
+  void dynamic_compiler::buildArguments( std::vector< std::string > &arguments, const boost::filesystem::path &_from, const boost::filesystem::path &_to ) const {
+    buildArguments( arguments );
     arguments.push_back( _from.string() );
     arguments.push_back( "-o" );
     arguments.push_back( _to.string() );
-    arguments.push_back( "-resource-dir" );
-    arguments.push_back( resource_directory.string() );
     arguments.push_back( "" );
   }
-  void dynamic_compiler::setupCompiler( clang::CompilerInstance &compiler, const boost::filesystem::path &_from, const boost::filesystem::path &_to ) const {
-    std::vector< std::string > arguments;
-    buildArguments( arguments, _from, _to );
+  void dynamic_compiler::setupCompiler( clang::CompilerInstance &compiler, const std::vector< std::string > &arguments ) const {
     std::vector< const char* > cstyle_arguments;
-    for( std::vector< std::string >::iterator iter = arguments.begin(); iter != arguments.end(); ++iter )
+    for( std::vector< std::string >::const_iterator iter = arguments.begin(); iter != arguments.end(); ++iter )
       cstyle_arguments.push_back( iter->c_str() );
     compiler.createDiagnostics( cstyle_arguments.size(), cstyle_arguments.data(), NULL );
     clang::CompilerInvocation::CreateFromArgs(
@@ -123,6 +124,11 @@ namespace dcompile {
                         target_opts
                     ) );
   }
+  void dynamic_compiler::setupCompiler( clang::CompilerInstance &compiler, const boost::filesystem::path &_from, const boost::filesystem::path &_to ) const {
+    std::vector< std::string > arguments;
+    buildArguments( arguments, _from, _to );
+    setupCompiler( compiler, arguments );
+  }
   module dynamic_compiler::operator()( const std::string &source_code, Language lang ) const {
     TemporaryFile source_file_name( 64, getFileSuffix( lang ) );
     boost::shared_ptr< TemporaryFile > bc_file_name( new TemporaryFile( 64, ".bc" ) );
@@ -133,10 +139,7 @@ namespace dcompile {
     clang::CompilerInstance compiler; 
     setupCompiler( compiler, source_file_name.getPath(), bc_file_name->getPath() );
 
-    clang::EmitBCAction action( getContext().get() );
-    compiler.ExecuteAction ( action );
-    module lib( getContext(), optlevel, bc_file_name );
-    return lib;
+    return getModule( compiler, bc_file_name );
   }
   std::string dynamic_compiler::dumpLLVM( const std::string &source_code, Language lang ) const {
     TemporaryFile source_file_name( 64, getFileSuffix( lang ) );
@@ -170,5 +173,41 @@ namespace dcompile {
     std::string result;
     std::fstream asm_file( ast_file_name.getPath().c_str(), std::ios::in );
     return std::string( std::istreambuf_iterator<char>(asm_file), std::istreambuf_iterator<char>() );
+  }
+  module dynamic_compiler::operator()( const boost::filesystem::path &path ) const {
+    boost::shared_ptr< TemporaryFile > bc_file_name( new TemporaryFile( 64, ".bc" ) );
+    clang::CompilerInstance compiler; 
+    setupCompiler( compiler, path, bc_file_name->getPath() );
+    
+    return getModule( compiler, bc_file_name );
+  }
+  std::string dynamic_compiler::dumpLLVM( const boost::filesystem::path &path ) const {
+    TemporaryFile ast_file_name( 64, ".ll" );
+    clang::CompilerInstance compiler;
+    setupCompiler( compiler, path, ast_file_name.getPath() );
+    
+    clang::EmitLLVMAction action( getContext().get() );
+    compiler.ExecuteAction ( action );
+    std::string result;
+    std::fstream asm_file( ast_file_name.getPath().c_str(), std::ios::in );
+    return std::string( std::istreambuf_iterator<char>(asm_file), std::istreambuf_iterator<char>() );
+  }
+  std::string dynamic_compiler::dumpAsm( const boost::filesystem::path &path ) const {
+    native_target::init();
+    TemporaryFile ast_file_name( 64, ".S" );
+    clang::CompilerInstance compiler; 
+    setupCompiler( compiler, path, ast_file_name.getPath() );
+    
+    clang::EmitAssemblyAction action( getContext().get() );
+    compiler.ExecuteAction ( action );
+    std::string result;
+    std::fstream asm_file( ast_file_name.getPath().c_str(), std::ios::in );
+    return std::string( std::istreambuf_iterator<char>(asm_file), std::istreambuf_iterator<char>() );
+  }
+  module dynamic_compiler::getModule( clang::CompilerInstance &compiler, const boost::shared_ptr< TemporaryFile > &bc_file_name ) const {
+    clang::EmitBCAction action( getContext().get() );
+    compiler.ExecuteAction ( action );
+    module lib( getContext(), optlevel, bc_file_name );
+    return lib;
   }
 }

@@ -39,10 +39,14 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/type_traits.hpp>
+#include <boost/utility/enable_if.hpp>
 
 #include <llvm/LLVMContext.h>
+#include <llvm/Linker.h>
+#include <llvm/Support/Path.h>
 
 #include <clang/Frontend/CompilerInstance.h>
+#include <clang/CodeGen/CodeGenAction.h>
 
 namespace dcompile {
   class dynamic_compiler : public context_holder {
@@ -63,12 +67,41 @@ namespace dcompile {
     const header_path &getHeaderPath() const {
       return header;
     }
-    module operator()( const std::string &source_code, Language lang = CXX ) const;
-    std::string dumpLLVM( const std::string &source_code, Language lang = CXX ) const;
-    std::string dumpAsm( const std::string &source_code, Language lang = CXX ) const;
+    module operator()( const std::string &source_code, Language lang ) const;
+    std::string dumpLLVM( const std::string &source_code, Language lang ) const;
+    std::string dumpAsm( const std::string &source_code, Language lang ) const;
+    module operator()( const boost::filesystem::path &path ) const;
+    std::string dumpLLVM( const boost::filesystem::path &path ) const;
+    std::string dumpAsm( const boost::filesystem::path &path ) const;
+    template< typename Iterator >
+    module operator()( Iterator begin, Iterator end,
+                      typename boost::enable_if< boost::is_same< typename boost::remove_cv< typename boost::iterator_value< Iterator >::type >::type, boost::filesystem::path > >::type* = 0
+                      ) const {
+      std::vector< boost::shared_ptr< TemporaryFile > > bc_file_names( std::distance( begin, end ) );
+      typename std::vector< boost::shared_ptr< TemporaryFile > >::iterator bc_iter;
+      Iterator src_iter;
+      for( src_iter = begin, bc_iter = bc_file_names.begin(); src_iter != end, bc_iter != bc_file_names.end(); ++src_iter, ++bc_iter ) {
+        bc_iter->reset( new TemporaryFile( 64, ".bc" ) );
+        clang::CompilerInstance compiler; 
+        setupCompiler( compiler, *src_iter, (*bc_iter)->getPath() );
+        clang::EmitBCAction action( getContext().get() );
+        compiler.ExecuteAction ( action );
+      }
+      llvm::Linker linker( "linker", "composite", *getContext().get(), 0 );
+      for( bc_iter = bc_file_names.begin(); bc_iter != bc_file_names.end(); ++bc_iter ) {
+        llvm::sys::Path bc_path;
+        bc_path.set( (*bc_iter)->getPath().c_str() );
+        bool is_native;
+        linker.LinkInFile( bc_path, is_native );
+      }
+      return module( getContext(), optlevel, linker.releaseModule() );
+    }
   private:
+    void buildArguments( std::vector< std::string > &arguments ) const;
     void buildArguments( std::vector< std::string > &arguments, const boost::filesystem::path &_from, const boost::filesystem::path &_to ) const;
+    void setupCompiler( clang::CompilerInstance &compiler, const std::vector< std::string > &arguments ) const;
     void setupCompiler( clang::CompilerInstance &compiler, const boost::filesystem::path &_from, const boost::filesystem::path &_to ) const;
+    module getModule( clang::CompilerInstance &compiler, const boost::shared_ptr< TemporaryFile > &bc_file_name ) const;
     const boost::filesystem::path resource_directory;
     header_path header;
     loader library_loader;

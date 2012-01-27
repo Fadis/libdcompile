@@ -25,53 +25,44 @@
  *                                                                           *
  *****************************************************************************/
 
-#ifndef DCOMPILE_MODULE_HPP
-#define DCOMPILE_MODULE_HPP
-
+#include <iostream>
 #include <string>
-#include <vector>
 
-#include <dcompile/common.hpp>
-#include <dcompile/context_holder.hpp>
-#include <dcompile/function.hpp>
-#include <dcompile/mktemp.hpp>
-
-#include <boost/shared_ptr.hpp>
-#include <boost/optional.hpp>
-#include <boost/thread.hpp>
-#include <boost/utility/enable_if.hpp>
-
-#include <llvm/LLVMContext.h>
-#include <llvm/Module.h>
-#include <llvm/Function.h>
-#include <llvm/DerivedTypes.h>
-
-#include <llvm/ExecutionEngine/ExecutionEngine.h>
-#include <llvm/ExecutionEngine/GenericValue.h>
-
-
-namespace dcompile {
-  class module : public context_holder {
-  public:
-    module(
-      const boost::shared_ptr< llvm::LLVMContext > &context,
-      OptimizeLevel optlevel,
-      const boost::shared_ptr< dcompile::TemporaryFile > &file
-    );
-    module(
-      const boost::shared_ptr< llvm::LLVMContext > &context,
-      OptimizeLevel optlevel,
-      llvm::Module *_module
-    );
-    int operator()( const std::vector< std::string > &argv, char * const *envp );
-    boost::optional< function > getFunction( const std::string &name );
-  private:
-    static void deleteBuilder( llvm::EngineBuilder *builder, boost::shared_ptr< llvm::ExecutionEngine > engine );
-    boost::shared_ptr< dcompile::TemporaryFile > bc_file;
-    boost::shared_ptr< llvm::EngineBuilder > builder;
-    llvm::Module *llvm_module;
-    boost::shared_ptr< llvm::ExecutionEngine > engine;
-  };
+#include <dcompile/dcompile.hpp>
+void hoge() {
+  std::cout << "moo" << std::endl;
 }
 
-#endif
+int main() {
+  float a = 5.0f;
+
+  std::string source_code = 
+  "#include <iostream>\n"
+  "#include <jpeglib.h>\n"
+  "void hoge();"
+  "extern \"C\" void foo( float *a ) {"
+  "  struct jpeg_compress_struct cinfo;"
+  "  std::cout << *a << \" inside\" << std::endl;"
+  "  jpeg_create_compress( &cinfo );"
+  "  *a += 0.1f;"
+  "  hoge();"
+  "}";
+  dcompile::dynamic_compiler dc;
+  dc.getLoader().enableSystemPath();
+  dc.getHeaderPath().enableSystemPath();
+  if( !dc.getLoader().load( "jpeg" ) ) {
+    std::cout << "unable to load libjpeg." << std::endl;
+  }
+  else {
+    std::cout << dc.dumpLLVM( source_code, dcompile::CXX ) << std::endl;
+    std::cout << dc.dumpAsm( source_code, dcompile::CXX ) << std::endl;
+    boost::optional< dcompile::module > lib = dc( source_code, dcompile::CXX );
+    if( lib ) {
+      boost::optional< dcompile::function > foo = lib->getFunction( "foo" );
+      if( foo )
+        (*foo)( &a );
+    }
+  }
+  std::cout << a << " outside" << std::endl;
+}
+
