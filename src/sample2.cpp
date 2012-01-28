@@ -29,12 +29,9 @@
 #include <string>
 
 #include <dcompile/dcompile.hpp>
-void hoge() {
-  std::cout << "moo" << std::endl;
-}
 
 int main() {
-  float a[] = { 1.0f, 2.0f, 3.0f, 4.0f };
+  float a[ 4 ] = { 5.0f, 6.0f, 7.0f, 8.0f };
 
   std::string source_code = 
   "typedef float float1 __attribute__((ext_vector_type(1)));"
@@ -46,15 +43,15 @@ int main() {
   "  a[ 0 ] = p.x + p.y + p.z + p.w;"
   "}";
   dcompile::dynamic_compiler dc;
-  dc.getLoader().enableSystemPath();
-  dc.getHeaderPath().enableSystemPath();
+//  dc.getLoader().enableSystemPath();
+//  dc.getHeaderPath().enableSystemPath();
   std::cout << dc.dumpAsm( source_code, dcompile::CXX ) << std::endl;
-  boost::optional< dcompile::module > lib = dc( source_code, dcompile::CXX );
-  if( lib ) {
-    boost::optional< dcompile::function > foo = lib->getFunction( "foo" );
-    if( foo )
-      (*foo)( &a );
-  }
+  dcompile::module lib = dc( source_code, dcompile::CXX );
+  boost::optional< dcompile::function > foo = lib.getFunction( "foo" );
+  if( foo )
+    (*foo)( &a );
+  else
+    std::cout << "no function!" << std::endl;
   std::cout << a[0] << " " << a[1] << " " << a[2] << " " << a[3] << std::endl;
 }
 

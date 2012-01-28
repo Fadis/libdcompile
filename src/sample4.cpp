@@ -30,9 +30,6 @@
 #include <boost/preprocessor/stringize.hpp>
 
 #include <dcompile/dcompile.hpp>
-void hoge() {
-  std::cout << "moo" << std::endl;
-}
 
 int main() {
   float a = 5.0f;
@@ -41,20 +38,15 @@ int main() {
   dcompile::dynamic_compiler dc;
   dc.getLoader().enableSystemPath();
   dc.getHeaderPath().enableSystemPath();
-  if( !dc.getLoader().load( "jpeg" ) ) {
-    std::cout << "unable to load libjpeg." << std::endl;
-  }
-  else {
-    std::vector< dcompile::object > objs;
-    objs.push_back( dc.getObject( sample_source_dir/"hoge.cpp" ) );
-    objs.push_back( dc.getObject( sample_source_dir/"fuga.cpp" ) );
-    dcompile::module mod = dcompile::load( dcompile::link( objs.begin(), objs.end() ) );
-    boost::optional< dcompile::function > foo = mod.getFunction( "foo" );
-    if( foo )
-      (*foo)( &a );
-    else
-      std::cout << "No function!!" << std::endl;
-  }
+  std::vector< dcompile::object > objs;
+  objs.push_back( dc.getObject( sample_source_dir/"hoge.cpp" ) );
+  objs.push_back( dc.getObject( sample_source_dir/"fuga.cpp" ) );
+  dcompile::module mod = dcompile::load( dcompile::link( objs.begin(), objs.end() ) );
+  boost::optional< dcompile::function > foo = mod.getFunction( "foo" );
+  if( foo )
+    (*foo)( &a );
+  else
+    std::cout << "No function!!" << std::endl;
   std::cout << a << " outside" << std::endl;
 }
 

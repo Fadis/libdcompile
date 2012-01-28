@@ -30,9 +30,6 @@
 #include <boost/preprocessor/stringize.hpp>
 
 #include <dcompile/dcompile.hpp>
-void hoge() {
-  std::cout << "moo" << std::endl;
-}
 
 int main() {
   float a = 5.0f;
@@ -44,17 +41,12 @@ int main() {
   dcompile::dynamic_compiler dc;
   dc.getLoader().enableSystemPath();
   dc.getHeaderPath().enableSystemPath();
-  if( !dc.getLoader().load( "jpeg" ) ) {
-    std::cout << "unable to load libjpeg." << std::endl;
-  }
-  else {
-    dcompile::module lib = dc( files.begin(), files.end() );
-    boost::optional< dcompile::function > foo = lib.getFunction( "foo" );
-    if( foo )
-      (*foo)( &a );
-    else
-      std::cout << "No function!!" << std::endl;
-  }
+  dcompile::module lib = dc( files.begin(), files.end() );
+  boost::optional< dcompile::function > foo = lib.getFunction( "foo" );
+  if( foo )
+    (*foo)( &a );
+  else
+    std::cout << "No function!!" << std::endl;
   std::cout << a << " outside" << std::endl;
 }
 
