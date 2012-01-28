@@ -27,6 +27,7 @@
 
 #include <iostream>
 #include <string>
+#include <boost/preprocessor/stringize.hpp>
 
 #include <dcompile/dcompile.hpp>
 void hoge() {
@@ -34,32 +35,26 @@ void hoge() {
 }
 
 int main() {
-  float a[] = { 1.0f, 2.0f, 3.0f, 4.0f };
+  float a = 5.0f;
 
-  std::string source_code = 
-  "typedef float float1 __attribute__((ext_vector_type(1)));"
-  "typedef float float2 __attribute__((ext_vector_type(2)));"
-  "typedef float float3 __attribute__((ext_vector_type(3)));"
-  "typedef float float4 __attribute__((ext_vector_type(4)));"
-  "extern \"C\" void foo( float *a ) {"
-  "  float4 p;"
-  "  p.x = a[0];"
-  "  p.y = a[1];"
-  "  p.z = a[2];"
-  "  p.w = a[3];"
-  "  p = p * p;"
-  "  a[ 0 ] = p.x + p.y + p.z + p.w;"
-  "}";
+  boost::filesystem::path sample_source_dir( BOOST_PP_STRINGIZE( SAMPLE_SOURCE_DIRECTORY ) );
   dcompile::dynamic_compiler dc;
   dc.getLoader().enableSystemPath();
   dc.getHeaderPath().enableSystemPath();
-  std::cout << dc.dumpAsm( source_code, dcompile::CXX ) << std::endl;
-  boost::optional< dcompile::module > lib = dc( source_code, dcompile::CXX );
-  if( lib ) {
-    boost::optional< dcompile::function > foo = lib->getFunction( "foo" );
+  if( !dc.getLoader().load( "jpeg" ) ) {
+    std::cout << "unable to load libjpeg." << std::endl;
+  }
+  else {
+    std::vector< dcompile::object > objs;
+    objs.push_back( dc.getObject( sample_source_dir/"hoge.cpp" ) );
+    objs.push_back( dc.getObject( sample_source_dir/"fuga.cpp" ) );
+    dcompile::module mod = dcompile::load( dcompile::link( objs.begin(), objs.end() ) );
+    boost::optional< dcompile::function > foo = mod.getFunction( "foo" );
     if( foo )
       (*foo)( &a );
+    else
+      std::cout << "No function!!" << std::endl;
   }
-  std::cout << a[0] << " " << a[1] << " " << a[2] << " " << a[3] << std::endl;
+  std::cout << a << " outside" << std::endl;
 }
 

@@ -29,5 +29,6 @@
 #define DCOMPILE_DCOMPILE_HPP
 
 #include <dcompile/dynamic_compiler.hpp>
+#include <dcompile/linker.hpp>
 
 #endif

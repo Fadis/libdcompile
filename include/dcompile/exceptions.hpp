@@ -34,6 +34,7 @@ namespace dcompile {
   class InvalidArgument {};
   class UnableToCreateUniqueFile {};
   class UnsupportedLanguage {};
+  class LinkFailed {};
 }
 
 #endif

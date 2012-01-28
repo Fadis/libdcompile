@@ -48,16 +48,12 @@ int main() {
     std::cout << "unable to load libjpeg." << std::endl;
   }
   else {
-    boost::optional< dcompile::module > lib = dc( files.begin(), files.end() );
-    if( lib ) {
-      boost::optional< dcompile::function > foo = lib->getFunction( "foo" );
-      if( foo )
-        (*foo)( &a );
-      else
-        std::cout << "No function!!" << std::endl;
-    }
+    dcompile::module lib = dc( files.begin(), files.end() );
+    boost::optional< dcompile::function > foo = lib.getFunction( "foo" );
+    if( foo )
+      (*foo)( &a );
     else
-      std::cout << "No module!!" << std::endl;
+      std::cout << "No function!!" << std::endl;
   }
   std::cout << a << " outside" << std::endl;
 }

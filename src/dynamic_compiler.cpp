@@ -32,6 +32,7 @@
 #include <dcompile/context_holder.hpp>
 #include <dcompile/native_target.hpp>
 #include <dcompile/module.hpp>
+#include <dcompile/object.hpp>
 #include <dcompile/loader.hpp>
 #include <dcompile/header_path.hpp>
 #include <dcompile/mktemp.hpp>
@@ -45,6 +46,7 @@
 #include <llvm/Support/Host.h>
 #include <llvm/Support/Path.h>
 #include <llvm/LLVMContext.h>
+#include <llvm/Support/IRReader.h>
 
 #include <clang/Basic/TargetInfo.h>
 #include <clang/Basic/TargetOptions.h>
@@ -131,15 +133,27 @@ namespace dcompile {
   }
   module dynamic_compiler::operator()( const std::string &source_code, Language lang ) const {
     TemporaryFile source_file_name( 64, getFileSuffix( lang ) );
-    boost::shared_ptr< TemporaryFile > bc_file_name( new TemporaryFile( 64, ".bc" ) );
+    TemporaryFile bc_file_name( 64, ".bc" );
     {
       std::fstream source_file( source_file_name.getPath().c_str(), std::ios::out );
       source_file << source_code;
     }
     clang::CompilerInstance compiler; 
-    setupCompiler( compiler, source_file_name.getPath(), bc_file_name->getPath() );
+    setupCompiler( compiler, source_file_name.getPath(), bc_file_name.getPath() );
 
     return getModule( compiler, bc_file_name );
+  }
+  object dynamic_compiler::getObject( const std::string &source_code, Language lang ) const {
+    TemporaryFile source_file_name( 64, getFileSuffix( lang ) );
+    TemporaryFile bc_file_name( 64, ".bc" );
+    {
+      std::fstream source_file( source_file_name.getPath().c_str(), std::ios::out );
+      source_file << source_code;
+    }
+    clang::CompilerInstance compiler; 
+    setupCompiler( compiler, source_file_name.getPath(), bc_file_name.getPath() );
+    
+    return getObject( compiler, bc_file_name );
   }
   std::string dynamic_compiler::dumpLLVM( const std::string &source_code, Language lang ) const {
     TemporaryFile source_file_name( 64, getFileSuffix( lang ) );
@@ -175,11 +189,18 @@ namespace dcompile {
     return std::string( std::istreambuf_iterator<char>(asm_file), std::istreambuf_iterator<char>() );
   }
   module dynamic_compiler::operator()( const boost::filesystem::path &path ) const {
-    boost::shared_ptr< TemporaryFile > bc_file_name( new TemporaryFile( 64, ".bc" ) );
+    TemporaryFile bc_file_name( 64, ".bc" );
     clang::CompilerInstance compiler; 
-    setupCompiler( compiler, path, bc_file_name->getPath() );
+    setupCompiler( compiler, path, bc_file_name.getPath() );
     
     return getModule( compiler, bc_file_name );
+  }
+  object dynamic_compiler::getObject( const boost::filesystem::path &path ) const {
+    TemporaryFile bc_file_name( 64, ".bc" );
+    clang::CompilerInstance compiler; 
+    setupCompiler( compiler, path, bc_file_name.getPath() );
+    
+    return getObject( compiler, bc_file_name );
   }
   std::string dynamic_compiler::dumpLLVM( const boost::filesystem::path &path ) const {
     TemporaryFile ast_file_name( 64, ".ll" );
@@ -204,10 +225,34 @@ namespace dcompile {
     std::fstream asm_file( ast_file_name.getPath().c_str(), std::ios::in );
     return std::string( std::istreambuf_iterator<char>(asm_file), std::istreambuf_iterator<char>() );
   }
-  module dynamic_compiler::getModule( clang::CompilerInstance &compiler, const boost::shared_ptr< TemporaryFile > &bc_file_name ) const {
+  module dynamic_compiler::getModule( clang::CompilerInstance &compiler, TemporaryFile &bc_file_name ) const {
     clang::EmitBCAction action( getContext().get() );
     compiler.ExecuteAction ( action );
-    module lib( getContext(), optlevel, bc_file_name );
+    native_target::init();
+    llvm::SMDiagnostic Err;
+    llvm::Module *llvm_module = llvm::ParseIRFile( bc_file_name.getPath().c_str(), Err, *getContext() );
+    std::string ErrorMsg;
+    if ( llvm_module->MaterializeAllPermanently(&ErrorMsg)) {
+      llvm::errs() << "dcompile::module" << ": bitcode didn't read correctly.\n";
+      llvm::errs() << "Reason: " << ErrorMsg << "\n";
+      throw UnableToLoadModule();
+    }
+    module lib( getContext(), optlevel, llvm_module );
+    return lib;
+  }
+  object dynamic_compiler::getObject( clang::CompilerInstance &compiler, TemporaryFile &bc_file_name ) const {
+    clang::EmitBCAction action( getContext().get() );
+    compiler.ExecuteAction ( action );
+    native_target::init();
+    llvm::SMDiagnostic Err;
+    boost::shared_ptr< llvm::Module > llvm_module( llvm::ParseIRFile( bc_file_name.getPath().c_str(), Err, *getContext() ) );
+    std::string ErrorMsg;
+    if ( llvm_module->MaterializeAllPermanently(&ErrorMsg)) {
+      llvm::errs() << "dcompile::module" << ": bitcode didn't read correctly.\n";
+      llvm::errs() << "Reason: " << ErrorMsg << "\n";
+      throw UnableToLoadModule();
+    }
+    object lib( getContext(), optlevel, llvm_module );
     return lib;
   }
 }

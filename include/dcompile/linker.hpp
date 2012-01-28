@@ -25,26 +25,51 @@
  *                                                                           *
  *****************************************************************************/
 
-#ifndef DCOMPILE_CONTEXT_HOLDER_HPP
-#define DCOMPILE_CONTEXT_HOLDER_HPP
+#ifndef DCOMPILE_LINKER_HPP
+#define DCOMPILE_LINKER_HPP
+
+#include <string>
+#include <vector>
+
+#include <dcompile/common.hpp>
+#include <dcompile/object.hpp>
+#include <dcompile/module.hpp>
+#include <dcompile/mktemp.hpp>
 
 #include <boost/shared_ptr.hpp>
+#include <boost/optional.hpp>
+#include <boost/thread.hpp>
+#include <boost/utility/enable_if.hpp>
 
 #include <llvm/LLVMContext.h>
+#include <llvm/Module.h>
+#include <llvm/Function.h>
+#include <llvm/DerivedTypes.h>
+
+#include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include <llvm/ExecutionEngine/GenericValue.h>
+#include <llvm/Transforms/Utils/Cloning.h>
 
 namespace dcompile {
-  class context_holder {
-  public:
-    context_holder() : llvm_context( new llvm::LLVMContext ) {
+  template< typename Iterator >
+  object link(
+    Iterator begin, Iterator end,
+    typename boost::enable_if< boost::is_same< typename boost::remove_cv< typename boost::iterator_value< Iterator >::type >::type, object > >::type* = 0
+  ) {
+    if( std::distance( begin, end ) == 0 )
+      throw LinkFailed();
+    llvm::Linker linker( "linker", "composite", *begin->getContext().get(), 0 );
+    for( Iterator iter = begin; iter != end; ++iter ) {
+      if( linker.LinkInModule( llvm::CloneModule( iter->get().get() ) ) )
+        throw LinkFailed();
     }
-    context_holder( const boost::shared_ptr< llvm::LLVMContext > &context ) : llvm_context( context ) {
-    }
-    const boost::shared_ptr< llvm::LLVMContext > &getContext() const {
-      return llvm_context;
-    }
-  private:
-    boost::shared_ptr< llvm::LLVMContext > llvm_context;
-  };
+    boost::shared_ptr< llvm::Module > llvm_module( linker.releaseModule() );
+    return object( begin->getContext(), begin->getOptimizeLevel(), llvm_module );
+  }
+  module load( const object &_obj ) {
+    llvm::Module *llvm_module( llvm::CloneModule( _obj.get().get() ) );
+    return module( _obj.getContext(), _obj.getOptimizeLevel(), llvm_module );
+  }
 }
 
 #endif

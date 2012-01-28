@@ -25,44 +25,45 @@
  *                                                                           *
  *****************************************************************************/
 
-#include <iostream>
 #include <string>
+#include <vector>
 
-#include <dcompile/dcompile.hpp>
-void hoge() {
-  std::cout << "moo" << std::endl;
-}
+#include <dcompile/common.hpp>
+#include <dcompile/context_holder.hpp>
+#include <dcompile/function.hpp>
+#include <dcompile/mktemp.hpp>
+#include <dcompile/object.hpp>
+#include <dcompile/native_target.hpp>
 
-int main() {
-  float a = 5.0f;
+#include <boost/shared_ptr.hpp>
+#include <boost/optional.hpp>
+#include <boost/thread.hpp>
 
-  std::string source_code = 
-  "#include <iostream>\n"
-  "#include <jpeglib.h>\n"
-  "void hoge();"
-  "extern \"C\" void foo( float *a ) {"
-  "  struct jpeg_compress_struct cinfo;"
-  "  std::cout << *a << \" inside\" << std::endl;"
-  "  jpeg_create_compress( &cinfo );"
-  "  *a += 0.1f;"
-  "  hoge();"
-  "}";
-  dcompile::dynamic_compiler dc;
-  dc.getLoader().enableSystemPath();
-  dc.getHeaderPath().enableSystemPath();
-  if( !dc.getLoader().load( "jpeg" ) ) {
-    std::cout << "unable to load libjpeg." << std::endl;
-  }
-  else {
-    std::cout << dc.dumpLLVM( source_code, dcompile::CXX ) << std::endl;
-    std::cout << dc.dumpAsm( source_code, dcompile::CXX ) << std::endl;
-    boost::optional< dcompile::module > lib = dc( source_code, dcompile::CXX );
-    if( lib ) {
-      boost::optional< dcompile::function > foo = lib->getFunction( "foo" );
-      if( foo )
-        (*foo)( &a );
+#include <llvm/Support/raw_ostream.h>
+#include <llvm/LLVMContext.h>
+#include <llvm/Module.h>
+#include <llvm/Function.h>
+#include <llvm/DerivedTypes.h>
+#include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include <llvm/ExecutionEngine/GenericValue.h>
+#include <llvm/ExecutionEngine/JIT.h>
+#include <llvm/ExecutionEngine/JITEventListener.h>
+#include <llvm/ExecutionEngine/MCJIT.h>
+#include <llvm/Support/IRReader.h>
+#include <llvm/Support/SourceMgr.h>
+#include <llvm/Transforms/Utils/Cloning.h>
+
+namespace dcompile {
+  object::object(
+    const boost::shared_ptr< llvm::LLVMContext > &context,
+    OptimizeLevel _optlevel,
+    boost::shared_ptr< llvm::Module > _module
+  ) : context_holder( context ), llvm_module( _module ), optlevel( _optlevel ) {
+    std::string ErrorMsg;
+    if (llvm_module->MaterializeAllPermanently(&ErrorMsg)) {
+      llvm::errs() << "dcompile::object" << ": bitcode didn't read correctly.\n";
+      llvm::errs() << "Reason: " << ErrorMsg << "\n";
+      throw UnableToLoadModule();
     }
   }
-  std::cout << a << " outside" << std::endl;
 }
-

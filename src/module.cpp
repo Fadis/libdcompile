@@ -53,60 +53,6 @@
 #include <llvm/Support/SourceMgr.h>
 
 namespace dcompile {
-
-  module::module(
-     const boost::shared_ptr< llvm::LLVMContext > &context,
-     OptimizeLevel optlevel,
-     const boost::shared_ptr< TemporaryFile > &file
-  ) : context_holder( context ), bc_file( file ) {
-    native_target::init();
-    llvm::SMDiagnostic Err;
-    llvm_module = llvm::ParseIRFile( bc_file->getPath().c_str(), Err, *getContext() );
-    if (!llvm_module) {
-      Err.print( "dcompile::module", llvm::errs());
-      throw UnableToLoadModule();
-    }
-    std::string ErrorMsg;
-    if (llvm_module->MaterializeAllPermanently(&ErrorMsg)) {
-      llvm::errs() << "dcompile::module" << ": bitcode didn't read correctly.\n";
-      llvm::errs() << "Reason: " << ErrorMsg << "\n";
-      throw UnableToLoadModule();
-    }
-    llvm::EngineBuilder *engine_builder = new llvm::EngineBuilder( llvm_module );
-    engine_builder->setErrorStr(&ErrorMsg);
-    engine_builder->setEngineKind(llvm::EngineKind::JIT);
-    switch( optlevel ) {
-      case None:
-        engine_builder->setOptLevel( llvm::CodeGenOpt::None );
-        break;
-      case Less:
-        engine_builder->setOptLevel( llvm::CodeGenOpt::Less );
-        break;
-      case Default:
-        engine_builder->setOptLevel( llvm::CodeGenOpt::Default );
-        break;
-      case Aggressive:
-        engine_builder->setOptLevel( llvm::CodeGenOpt::Aggressive );
-        break;
-      default:
-        throw UnknownOptimizeLevel();
-    };
-    engine.reset( engine_builder->create() );
-    builder.reset( engine_builder, boost::bind( &module::deleteBuilder, _1, engine ) );
-    builder->setRelocationModel(llvm::Reloc::Default);
-    builder->setCodeModel( llvm::CodeModel::JITDefault );
-    builder->setUseMCJIT(true);
-    if (!engine) {
-      if (!ErrorMsg.empty())
-        llvm::errs() << "dcompile::module" << ": error creating EE: " << ErrorMsg << "\n";
-      else
-        llvm::errs() << "dcompile::module" << ": unknown error creating EE!\n";
-      throw UnableToLoadModule();
-    }
-    engine->RegisterJITEventListener(llvm::createOProfileJITEventListener());
-    engine->DisableLazyCompilation(true);
-    engine->runStaticConstructorsDestructors(false);
-  }
   module::module(
     const boost::shared_ptr< llvm::LLVMContext > &context,
     OptimizeLevel optlevel,

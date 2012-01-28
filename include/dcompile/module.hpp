@@ -56,18 +56,12 @@ namespace dcompile {
     module(
       const boost::shared_ptr< llvm::LLVMContext > &context,
       OptimizeLevel optlevel,
-      const boost::shared_ptr< dcompile::TemporaryFile > &file
-    );
-    module(
-      const boost::shared_ptr< llvm::LLVMContext > &context,
-      OptimizeLevel optlevel,
       llvm::Module *_module
     );
     int operator()( const std::vector< std::string > &argv, char * const *envp );
     boost::optional< function > getFunction( const std::string &name );
   private:
     static void deleteBuilder( llvm::EngineBuilder *builder, boost::shared_ptr< llvm::ExecutionEngine > engine );
-    boost::shared_ptr< dcompile::TemporaryFile > bc_file;
     boost::shared_ptr< llvm::EngineBuilder > builder;
     llvm::Module *llvm_module;
     boost::shared_ptr< llvm::ExecutionEngine > engine;

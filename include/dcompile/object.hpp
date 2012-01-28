@@ -25,25 +25,50 @@
  *                                                                           *
  *****************************************************************************/
 
-#ifndef DCOMPILE_CONTEXT_HOLDER_HPP
-#define DCOMPILE_CONTEXT_HOLDER_HPP
+#ifndef DCOMPILE_OBJECT_HPP
+#define DCOMPILE_OBJECT_HPP
+
+#include <string>
+#include <vector>
+
+#include <dcompile/common.hpp>
+#include <dcompile/context_holder.hpp>
+#include <dcompile/function.hpp>
+#include <dcompile/module.hpp>
+#include <dcompile/mktemp.hpp>
 
 #include <boost/shared_ptr.hpp>
+#include <boost/optional.hpp>
+#include <boost/thread.hpp>
+#include <boost/utility/enable_if.hpp>
 
 #include <llvm/LLVMContext.h>
+#include <llvm/Module.h>
+#include <llvm/Function.h>
+#include <llvm/DerivedTypes.h>
+
+#include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include <llvm/ExecutionEngine/GenericValue.h>
+#include <llvm/Transforms/Utils/Cloning.h>
+
 
 namespace dcompile {
-  class context_holder {
+  class object : public context_holder {
   public:
-    context_holder() : llvm_context( new llvm::LLVMContext ) {
+    object(
+      const boost::shared_ptr< llvm::LLVMContext > &context,
+      OptimizeLevel optlevel,
+      boost::shared_ptr< llvm::Module > _module
+    );
+    boost::shared_ptr< llvm::Module > get() const {
+      return boost::shared_ptr< llvm::Module >( llvm::CloneModule( llvm_module.get() ) );
     }
-    context_holder( const boost::shared_ptr< llvm::LLVMContext > &context ) : llvm_context( context ) {
-    }
-    const boost::shared_ptr< llvm::LLVMContext > &getContext() const {
-      return llvm_context;
+    OptimizeLevel getOptimizeLevel() const {
+      return optlevel;
     }
   private:
-    boost::shared_ptr< llvm::LLVMContext > llvm_context;
+    boost::shared_ptr< llvm::Module > llvm_module;
+    OptimizeLevel optlevel;
   };
 }
 

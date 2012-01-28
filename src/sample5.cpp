@@ -25,26 +25,38 @@
  *                                                                           *
  *****************************************************************************/
 
-#ifndef DCOMPILE_CONTEXT_HOLDER_HPP
-#define DCOMPILE_CONTEXT_HOLDER_HPP
+#include <dcompile/dcompile.hpp>
 
-#include <boost/shared_ptr.hpp>
+int main() {
+  static const char print_code[] =
+    "#include <iostream>\n"
+    "void p( const char *s ) { std::cout << s << std::endl; }";
+  static const char foo_code[] =
+    "void p( const char *s );"
+    "extern \"C\" void foo() { p( \"foo\" ); }";
+  static const char bar_code[] =
+    "void p( const char *s );"
+    "extern \"C\" void foo() { p( \"bar\" ); }";
+  static const char moo_code[] =
+    "void p( const char *s );"
+    "extern \"C\" void foo() { p( \"moo\" ); }";
+  static const char *codes[ 3 ] = { foo_code, bar_code, moo_code };
 
-#include <llvm/LLVMContext.h>
-
-namespace dcompile {
-  class context_holder {
-  public:
-    context_holder() : llvm_context( new llvm::LLVMContext ) {
-    }
-    context_holder( const boost::shared_ptr< llvm::LLVMContext > &context ) : llvm_context( context ) {
-    }
-    const boost::shared_ptr< llvm::LLVMContext > &getContext() const {
-      return llvm_context;
-    }
-  private:
-    boost::shared_ptr< llvm::LLVMContext > llvm_context;
-  };
+  dcompile::dynamic_compiler dc;
+  dc.getLoader().enableSystemPath();
+  dc.getHeaderPath().enableSystemPath();
+  dcompile::object print = dc.getObject( print_code, dcompile::CXX );
+  for( int index = 0; index != 3; ++index ) {
+    dcompile::object obj = dc.getObject( codes[ index ], dcompile::CXX );
+    std::vector< dcompile::object > objs;
+    objs.push_back( print );
+    objs.push_back( obj );
+    dcompile::module mod = dcompile::load( dcompile::link( objs.begin(), objs.end() ) );
+    boost::optional< dcompile::function > foo = mod.getFunction( "foo" );
+    if( foo )
+      (*foo)();
+    else
+      std::cout << "No function!!" << std::endl;
+  }
 }
 
-#endif
