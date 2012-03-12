@@ -40,8 +40,10 @@
 #include <boost/preprocessor/enum.hpp>
 #include <boost/preprocessor/cat.hpp>
 #include <boost/preprocessor/stringize.hpp>
+#include <boost/variant.hpp>
 
 #include <llvm/LLVMContext.h>
+#include <llvm/Type.h>
 #include <llvm/Module.h>
 #include <llvm/Function.h>
 #include <llvm/DerivedTypes.h>
@@ -53,9 +55,19 @@ namespace dcompile {
   void setParam( llvm::GenericValue &_dest, Type value,
                  typename boost::enable_if< boost::mpl::bool_<
                    boost::is_pod< Type >::value &&
-                   boost::is_pointer< Type >::value
+                   boost::is_pointer< Type >::value &&
+                   !boost::is_const< typename boost::remove_pointer< Type >::type >::value
                  > >::type* = 0 ) {
-    _dest.PointerVal = value;
+    _dest.PointerVal = static_cast< void* >( value );
+  }
+  template< typename Type >
+  void setParam( llvm::GenericValue &_dest, Type value,
+                 typename boost::enable_if< boost::mpl::bool_<
+                   boost::is_pod< Type >::value &&
+                   boost::is_pointer< Type >::value &&
+                   boost::is_const< typename boost::remove_pointer< Type >::type >::value
+                 > >::type* = 0 ) {
+    _dest.PointerVal = static_cast< void* >( const_cast< typename boost::remove_const< typename boost::remove_pointer< Type >::type >::type* >( value ) );
   }
   template< typename Type >
   void setParam( llvm::GenericValue &_dest, Type value,
@@ -77,18 +89,146 @@ namespace dcompile {
   }
   template< typename Type >
   void setParam( llvm::GenericValue &_dest, Type value,
+                typename boost::enable_if< boost::mpl::bool_<
+                boost::is_pod< Type >::value &&
+                !boost::is_pointer< Type >::value &&
+                boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, signed char >::value
+                > >::type* = 0 ) {
+    _dest.IntVal = llvm::APInt( sizeof( signed char ) * 8, static_cast< uint64_t >( value ), true );
+  }
+  template< typename Type >
+  void setParam( llvm::GenericValue &_dest, Type value,
+                typename boost::enable_if< boost::mpl::bool_<
+                boost::is_pod< Type >::value &&
+                !boost::is_pointer< Type >::value &&
+                boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, unsigned char >::value
+                > >::type* = 0 ) {
+    _dest.IntVal = llvm::APInt( sizeof( unsigned char ) * 8, static_cast< uint64_t >( value ), false );
+  }
+  template< typename Type >
+  void setParam( llvm::GenericValue &_dest, Type value,
+                typename boost::enable_if< boost::mpl::bool_<
+                boost::is_pod< Type >::value &&
+                !boost::is_pointer< Type >::value &&
+                boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, signed short >::value
+                > >::type* = 0 ) {
+    _dest.IntVal = llvm::APInt( sizeof( signed short ) * 8, static_cast< uint64_t >( value ), true );
+  }
+  template< typename Type >
+  void setParam( llvm::GenericValue &_dest, Type value,
+                typename boost::enable_if< boost::mpl::bool_<
+                boost::is_pod< Type >::value &&
+                !boost::is_pointer< Type >::value &&
+                boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, unsigned short >::value
+                > >::type* = 0 ) {
+    _dest.IntVal = llvm::APInt( sizeof( unsigned short ) * 8, static_cast< uint64_t >( value ), false );
+  }
+  template< typename Type >
+  void setParam( llvm::GenericValue &_dest, Type value,
+                typename boost::enable_if< boost::mpl::bool_<
+                boost::is_pod< Type >::value &&
+                !boost::is_pointer< Type >::value &&
+                boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, signed int >::value
+                > >::type* = 0 ) {
+    _dest.IntVal = llvm::APInt( sizeof( signed int ) * 8, static_cast< uint64_t >( value ), true );
+  }
+  template< typename Type >
+  void setParam( llvm::GenericValue &_dest, Type value,
+                typename boost::enable_if< boost::mpl::bool_<
+                boost::is_pod< Type >::value &&
+                !boost::is_pointer< Type >::value &&
+                boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, unsigned int >::value
+                > >::type* = 0 ) {
+    _dest.IntVal = llvm::APInt( sizeof( unsigned int ) * 8, static_cast< uint64_t >( value ), false );
+  }
+  template< typename Type >
+  void setParam( llvm::GenericValue &_dest, Type value,
+                typename boost::enable_if< boost::mpl::bool_<
+                boost::is_pod< Type >::value &&
+                !boost::is_pointer< Type >::value &&
+                boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, signed long >::value
+                > >::type* = 0 ) {
+    _dest.IntVal = llvm::APInt( sizeof( signed long ) * 8, static_cast< uint64_t >( value ), true );
+  }
+  template< typename Type >
+  void setParam( llvm::GenericValue &_dest, Type value,
+                typename boost::enable_if< boost::mpl::bool_<
+                boost::is_pod< Type >::value &&
+                !boost::is_pointer< Type >::value &&
+                boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, unsigned long >::value
+                > >::type* = 0 ) {
+    _dest.IntVal = llvm::APInt( sizeof( unsigned long ) * 8, static_cast< uint64_t >( value ), false );
+  }
+  template< typename Type >
+  void setParam( llvm::GenericValue &_dest, Type value,
+                typename boost::enable_if< boost::mpl::bool_<
+                boost::is_pod< Type >::value &&
+                !boost::is_pointer< Type >::value &&
+                boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, signed long long >::value
+                > >::type* = 0 ) {
+    _dest.IntVal = llvm::APInt( sizeof( signed long long ) * 8, static_cast< uint64_t >( value ), true );
+  }
+  template< typename Type >
+  void setParam( llvm::GenericValue &_dest, Type value,
+                typename boost::enable_if< boost::mpl::bool_<
+                boost::is_pod< Type >::value &&
+                !boost::is_pointer< Type >::value &&
+                boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, unsigned long long >::value
+                > >::type* = 0 ) {
+    _dest.IntVal = llvm::APInt( sizeof( unsigned long long ) * 8, static_cast< uint64_t >( value ), false );
+  }
+  template< typename Type >
+  void setParam( llvm::GenericValue &_dest, Type value,
                  typename boost::enable_if< boost::mpl::bool_<
                    boost::is_pod< Type >::value &&
                    !boost::is_pointer< Type >::value &&
                    !boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, float >::value &&
-                   !boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, double >::value
+                   !boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, double >::value &&
+                   !boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, signed char >::value &&
+                   !boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, unsigned char >::value &&
+                   !boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, signed short >::value &&
+                   !boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, unsigned short >::value &&
+                   !boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, signed int >::value &&
+                   !boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, unsigned int >::value &&
+                   !boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, signed long >::value &&
+                   !boost::is_same< typename boost::remove_cv< typename boost::remove_reference< Type >::type >::type, unsigned long >::value
                  > >::type* = 0 ) {
     if( sizeof( Type ) <= 8 )
       *static_cast< Type* >( static_cast< void* >( _dest.Untyped ) ) = value;
     else
       throw InvalidArgument();
   }
-
+  enum {
+    SIGNED_CHAR = 0,
+    UNSIGNED_CHAR,
+    SIGNED_SHORT,
+    UNSIGNED_SHORT,
+    SIGNED_INT,
+    UNSIGNED_INT,
+    SIGNED_LONG,
+    UNSIGNED_LONG,
+    SIGNED_LONG_LONG,
+    UNSIGNED_LONG_LONG,
+    SIGNED_FLOAT,
+    UNSIGNED_DOUBLE,
+    UNSIGNED_POINTER
+  };
+  typedef boost::variant<
+    signed char,
+    unsigned char,
+    signed short,
+    unsigned short,
+    signed int,
+    unsigned int,
+    signed long,
+    unsigned long,
+    signed long long,
+    unsigned long long,
+    float,
+    double,
+    void*
+  > return_value;
+  return_value getReturnValue( const llvm::Type &type, const llvm::GenericValue &_value );
   class function : public context_holder {
   public:
     function(

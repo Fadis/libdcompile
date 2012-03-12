@@ -50,6 +50,11 @@
 #include <clang/CodeGen/CodeGenAction.h>
 
 namespace dcompile {
+/*  class result {
+  public:
+    result( unsigned int _errs, unsigned int _warns, const std::string &_ )
+  }*/
+  
   class dynamic_compiler : public context_holder {
   public:
     dynamic_compiler();
@@ -76,6 +81,7 @@ namespace dcompile {
     object getObject( const boost::filesystem::path &path ) const;
     std::string dumpLLVM( const boost::filesystem::path &path ) const;
     std::string dumpAsm( const boost::filesystem::path &path ) const;
+    void compileEachSource( boost::shared_ptr< TemporaryFile > &bc, const boost::filesystem::path &src ) const;
     template< typename Iterator >
     module operator()( Iterator begin, Iterator end,
                       typename boost::enable_if< boost::is_same< typename boost::remove_cv< typename boost::iterator_value< Iterator >::type >::type, boost::filesystem::path > >::type* = 0
@@ -84,11 +90,7 @@ namespace dcompile {
       typename std::vector< boost::shared_ptr< TemporaryFile > >::iterator bc_iter;
       Iterator src_iter;
       for( src_iter = begin, bc_iter = bc_file_names.begin(); src_iter != end, bc_iter != bc_file_names.end(); ++src_iter, ++bc_iter ) {
-        bc_iter->reset( new TemporaryFile( 64, ".bc" ) );
-        clang::CompilerInstance compiler; 
-        setupCompiler( compiler, *src_iter, (*bc_iter)->getPath() );
-        clang::EmitBCAction action( getContext().get() );
-        compiler.ExecuteAction ( action );
+        compileEachSource( *bc_iter, *src_iter );
       }
       llvm::Linker linker( "linker", "composite", *getContext().get(), 0 );
       for( bc_iter = bc_file_names.begin(); bc_iter != bc_file_names.end(); ++bc_iter ) {
@@ -107,11 +109,7 @@ namespace dcompile {
       typename std::vector< boost::shared_ptr< TemporaryFile > >::iterator bc_iter;
       Iterator src_iter;
       for( src_iter = begin, bc_iter = bc_file_names.begin(); src_iter != end, bc_iter != bc_file_names.end(); ++src_iter, ++bc_iter ) {
-        bc_iter->reset( new TemporaryFile( 64, ".bc" ) );
-        clang::CompilerInstance compiler; 
-        setupCompiler( compiler, *src_iter, (*bc_iter)->getPath() );
-        clang::EmitBCAction action( getContext().get() );
-        compiler.ExecuteAction ( action );
+        compileEachSource( *bc_iter, *src_iter );
       }
       llvm::Linker linker( "linker", "composite", *getContext().get(), 0 );
       for( bc_iter = bc_file_names.begin(); bc_iter != bc_file_names.end(); ++bc_iter ) {
@@ -127,6 +125,7 @@ namespace dcompile {
     void buildArguments( std::vector< std::string > &arguments, const boost::filesystem::path &_from, const boost::filesystem::path &_to ) const;
     void setupCompiler( clang::CompilerInstance &compiler, const std::vector< std::string > &arguments ) const;
     void setupCompiler( clang::CompilerInstance &compiler, const boost::filesystem::path &_from, const boost::filesystem::path &_to ) const;
+    void execute( clang::CompilerInstance &compiler, clang::FrontendAction &action ) const;
     module getModule( clang::CompilerInstance &compiler, TemporaryFile &bc_file_name ) const;
     object getObject( clang::CompilerInstance &compiler, TemporaryFile &bc_file_name ) const;
     const boost::filesystem::path resource_directory;

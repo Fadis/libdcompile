@@ -218,12 +218,14 @@ extern "C" void setUniform( unsigned int name, float value ) {
   uniforms[ name ] =value;
 }
 
-extern "C" context *createContext() {
-  return new context;
+extern "C" void getContextSize( unsigned int *size ) {
+  *size = sizeof( context );
+}
+
+extern "C" void createContext( context *inst ) {
 }
 
 extern "C" void destroyContext( context *inst ) {
-  delete inst;
 }
 
 extern "C" void setLocal( context *ctx, unsigned int name, float value ) {

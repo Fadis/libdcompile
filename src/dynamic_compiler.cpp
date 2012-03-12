@@ -125,11 +125,30 @@ namespace dcompile {
                         compiler.getDiagnostics(),
                         target_opts
                     ) );
+    compiler.getTarget().setForcedLangOptions(compiler.getLangOpts());
   }
   void dynamic_compiler::setupCompiler( clang::CompilerInstance &compiler, const boost::filesystem::path &_from, const boost::filesystem::path &_to ) const {
     std::vector< std::string > arguments;
     buildArguments( arguments, _from, _to );
     setupCompiler( compiler, arguments );
+  }
+  void dynamic_compiler::execute( clang::CompilerInstance &compiler, clang::FrontendAction &action ) const {
+    for (unsigned i = 0, e = compiler.getFrontendOpts().Inputs.size(); i != e; ++i) {
+      if ( compiler.hasSourceManager())
+        compiler.getSourceManager().clearIDTables();
+      if ( action.BeginSourceFile( compiler, compiler.getFrontendOpts().Inputs[i].second, compiler.getFrontendOpts().Inputs[i].first ) ) {
+        action.Execute();
+        action.EndSourceFile();
+      }
+    }
+    compiler.getDiagnostics().getClient()->finish();
+  }
+  void dynamic_compiler::compileEachSource( boost::shared_ptr< TemporaryFile > &bc, const boost::filesystem::path &src ) const {
+    bc.reset( new TemporaryFile( 64, ".bc" ) );
+    clang::CompilerInstance compiler;
+    setupCompiler( compiler, src, bc->getPath() );
+    clang::EmitBCAction action( getContext().get() );
+    execute ( compiler, action );
   }
   module dynamic_compiler::operator()( const std::string &source_code, Language lang ) const {
     TemporaryFile source_file_name( 64, getFileSuffix( lang ) );
@@ -166,7 +185,7 @@ namespace dcompile {
     setupCompiler( compiler, source_file_name.getPath(), ast_file_name.getPath() );
     
     clang::EmitLLVMAction action( getContext().get() );
-    compiler.ExecuteAction ( action );
+    execute ( compiler, action );
     std::string result;
     std::fstream asm_file( ast_file_name.getPath().c_str(), std::ios::in );
     return std::string( std::istreambuf_iterator<char>(asm_file), std::istreambuf_iterator<char>() );
@@ -183,7 +202,7 @@ namespace dcompile {
     setupCompiler( compiler, source_file_name.getPath(), ast_file_name.getPath() );
     
     clang::EmitAssemblyAction action( getContext().get() );
-    compiler.ExecuteAction ( action );
+    execute ( compiler, action );
     std::string result;
     std::fstream asm_file( ast_file_name.getPath().c_str(), std::ios::in );
     return std::string( std::istreambuf_iterator<char>(asm_file), std::istreambuf_iterator<char>() );
@@ -208,7 +227,7 @@ namespace dcompile {
     setupCompiler( compiler, path, ast_file_name.getPath() );
     
     clang::EmitLLVMAction action( getContext().get() );
-    compiler.ExecuteAction ( action );
+    execute ( compiler, action );
     std::string result;
     std::fstream asm_file( ast_file_name.getPath().c_str(), std::ios::in );
     return std::string( std::istreambuf_iterator<char>(asm_file), std::istreambuf_iterator<char>() );
@@ -220,14 +239,14 @@ namespace dcompile {
     setupCompiler( compiler, path, ast_file_name.getPath() );
     
     clang::EmitAssemblyAction action( getContext().get() );
-    compiler.ExecuteAction ( action );
+    execute ( compiler, action );
     std::string result;
     std::fstream asm_file( ast_file_name.getPath().c_str(), std::ios::in );
     return std::string( std::istreambuf_iterator<char>(asm_file), std::istreambuf_iterator<char>() );
   }
   module dynamic_compiler::getModule( clang::CompilerInstance &compiler, TemporaryFile &bc_file_name ) const {
     clang::EmitBCAction action( getContext().get() );
-    compiler.ExecuteAction ( action );
+    execute ( compiler, action );
     native_target::init();
     llvm::SMDiagnostic Err;
     llvm::Module *llvm_module = llvm::ParseIRFile( bc_file_name.getPath().c_str(), Err, *getContext() );
@@ -242,12 +261,12 @@ namespace dcompile {
   }
   object dynamic_compiler::getObject( clang::CompilerInstance &compiler, TemporaryFile &bc_file_name ) const {
     clang::EmitBCAction action( getContext().get() );
-    compiler.ExecuteAction ( action );
+    execute ( compiler, action );
     native_target::init();
     llvm::SMDiagnostic Err;
     boost::shared_ptr< llvm::Module > llvm_module( llvm::ParseIRFile( bc_file_name.getPath().c_str(), Err, *getContext() ) );
     std::string ErrorMsg;
-    if ( llvm_module->MaterializeAllPermanently(&ErrorMsg)) {
+    if ( !llvm_module || llvm_module->MaterializeAllPermanently(&ErrorMsg)) {
       llvm::errs() << "dcompile::module" << ": bitcode didn't read correctly.\n";
       llvm::errs() << "Reason: " << ErrorMsg << "\n";
       throw UnableToLoadModule();

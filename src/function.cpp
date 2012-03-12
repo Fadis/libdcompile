@@ -41,6 +41,18 @@
 #include <llvm/ExecutionEngine/GenericValue.h>
 
 namespace dcompile {
+  return_value getReturnValue( const llvm::Type &type, const llvm::GenericValue &_value ) {
+    switch ( type.getTypeID() ) {
+      case llvm::Type::VoidTyID:
+        return return_value();
+      case llvm::Type::IntegerTyID:
+      case llvm::Type::FloatTyID:
+      case llvm::Type::DoubleTyID:
+      case llvm::Type::PointerTyID:
+      default:
+        throw InvalidArgument();
+    };
+  }
   function::function(
     const boost::shared_ptr< llvm::LLVMContext > &_llvm_context,
     const boost::shared_ptr< llvm::EngineBuilder > &_builder,
