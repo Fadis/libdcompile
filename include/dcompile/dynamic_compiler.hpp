@@ -125,6 +125,7 @@ namespace dcompile {
     void buildArguments( std::vector< std::string > &arguments, const boost::filesystem::path &_from, const boost::filesystem::path &_to ) const;
     void setupCompiler( clang::CompilerInstance &compiler, const std::vector< std::string > &arguments ) const;
     void setupCompiler( clang::CompilerInstance &compiler, const boost::filesystem::path &_from, const boost::filesystem::path &_to ) const;
+    bool begin( clang::CompilerInstance &compiler, clang::FrontendAction &action, const clang::FrontendInputFile &file ) const;
     void execute( clang::CompilerInstance &compiler, clang::FrontendAction &action ) const;
     module getModule( clang::CompilerInstance &compiler, TemporaryFile &bc_file_name ) const;
     object getObject( clang::CompilerInstance &compiler, TemporaryFile &bc_file_name ) const;

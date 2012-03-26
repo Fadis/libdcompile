@@ -27,6 +27,7 @@
 
 #include <vector>
 #include <string>
+#include <algorithm>
 
 #include <dcompile/common.hpp>
 #include <dcompile/context_holder.hpp>
@@ -54,7 +55,7 @@
 #include <clang/CodeGen/CodeGenAction.h>
 #include <clang/Basic/SourceManager.h>
 #include <clang/Basic/Version.h>
-
+#include <clang/Basic/FileManager.h>
 
 namespace dcompile {
   dynamic_compiler::dynamic_compiler()
@@ -126,17 +127,26 @@ namespace dcompile {
                         target_opts
                     ) );
     compiler.getTarget().setForcedLangOptions(compiler.getLangOpts());
+    compiler.createFileManager();
+    compiler.createSourceManager( compiler.getFileManager() );
   }
   void dynamic_compiler::setupCompiler( clang::CompilerInstance &compiler, const boost::filesystem::path &_from, const boost::filesystem::path &_to ) const {
     std::vector< std::string > arguments;
     buildArguments( arguments, _from, _to );
     setupCompiler( compiler, arguments );
   }
+  bool dynamic_compiler::begin( clang::CompilerInstance &compiler, clang::FrontendAction &action, const clang::FrontendInputFile &file ) const {
+    action.setCurrentInput( file );
+    action.setCompilerInstance( &compiler );
+      //    if( action.BeginInvocation( compiler ) )
+      //      goto FAILED;
+      /////////// STUB ///////////
+  }
   void dynamic_compiler::execute( clang::CompilerInstance &compiler, clang::FrontendAction &action ) const {
     for (unsigned i = 0, e = compiler.getFrontendOpts().Inputs.size(); i != e; ++i) {
       if ( compiler.hasSourceManager())
         compiler.getSourceManager().clearIDTables();
-      if ( action.BeginSourceFile( compiler, compiler.getFrontendOpts().Inputs[i].second, compiler.getFrontendOpts().Inputs[i].first ) ) {
+      if ( action.BeginSourceFile( compiler, compiler.getFrontendOpts().Inputs[i] ) ) {
         action.Execute();
         action.EndSourceFile();
       }
@@ -153,12 +163,21 @@ namespace dcompile {
   module dynamic_compiler::operator()( const std::string &source_code, Language lang ) const {
     TemporaryFile source_file_name( 64, getFileSuffix( lang ) );
     TemporaryFile bc_file_name( 64, ".bc" );
+    clang::CompilerInstance compiler; 
+    setupCompiler( compiler, source_file_name.getPath(), bc_file_name.getPath() );
+    compiler.createFileManager();
+    const clang::FileEntry *ram_file = compiler.getFileManager().getVirtualFile ( "/foo", source_code.size(), 10 );
+    std::cout << ram_file << std::endl;
+    std::string error;
+    std::cout << compiler.getFileManager().getFile(
+                                                            "/foo"
+                                                            ) << std::endl;
+    std::cout << error << std::endl;
+      //->getBuffer() = llvm::StringRef( source_code );
     {
       std::fstream source_file( source_file_name.getPath().c_str(), std::ios::out );
       source_file << source_code;
     }
-    clang::CompilerInstance compiler; 
-    setupCompiler( compiler, source_file_name.getPath(), bc_file_name.getPath() );
 
     return getModule( compiler, bc_file_name );
   }
