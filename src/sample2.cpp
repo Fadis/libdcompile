@@ -30,17 +30,16 @@
 
 #include <dcompile/dcompile.hpp>
 
-int main() {
+  float hoge() { return 1.0f; }
   float a[ 4 ] = { 5.0f, 6.0f, 7.0f, 8.0f };
+int main() {
+
 
   std::string source_code = 
-  "typedef float float1 __attribute__((ext_vector_type(1)));"
-  "typedef float float2 __attribute__((ext_vector_type(2)));"
-  "typedef float float3 __attribute__((ext_vector_type(3)));"
-  "typedef float float4 __attribute__((ext_vector_type(4)));"
-  "extern \"C\" void foo( float *a ) {"
-  "  float4 p = { 0.1f, 0.2f, 0.3f, 0.4f };"
-  "  a[ 0 ] = p.x + p.y + p.z + p.w;"
+  "float hoge();"
+  "extern float a[ 4 ];"
+  "extern \"C\" void foo() {"
+  "  a[ 0 ] = hoge();"
   "}";
   dcompile::dynamic_compiler dc;
 //  dc.getLoader().enableSystemPath();
@@ -49,7 +48,7 @@ int main() {
   dcompile::module lib = dc( source_code, dcompile::CXX );
   boost::optional< dcompile::function > foo = lib.getFunction( "foo" );
   if( foo )
-    (*foo)( &a );
+    (*foo)();
   else
     std::cout << "no function!" << std::endl;
   std::cout << a[0] << " " << a[1] << " " << a[2] << " " << a[3] << std::endl;

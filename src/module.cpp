@@ -96,7 +96,7 @@ namespace dcompile {
         llvm::errs() << "dcompile::module" << ": unknown error creating EE!\n";
       throw UnableToLoadModule();
     }
-    engine->RegisterJITEventListener(llvm::createOProfileJITEventListener());
+    engine->RegisterJITEventListener(llvm::JITEventListener::createOProfileJITEventListener());
     engine->DisableLazyCompilation(true);
     engine->runStaticConstructorsDestructors(false);
   }

@@ -11,3 +11,6 @@ $ cd build
 $ cmake ../libdcompile -DCMAKE_INSTALL_PREFIX=<prefix>
 $ make
 $ make insetll
+
+Known Issue
+System include path doesn't work on Linux
