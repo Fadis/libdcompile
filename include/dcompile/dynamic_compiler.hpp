@@ -32,6 +32,7 @@
 
 #include <dcompile/common.hpp>
 #include <dcompile/context_holder.hpp>
+#include <dcompile/native_target.hpp>
 #include <dcompile/module.hpp>
 #include <dcompile/object.hpp>
 #include <dcompile/loader.hpp>
@@ -86,6 +87,7 @@ namespace dcompile {
     module operator()( Iterator begin, Iterator end,
                       typename boost::enable_if< boost::is_same< typename boost::remove_cv< typename boost::iterator_value< Iterator >::type >::type, boost::filesystem::path > >::type* = 0
                       ) const {
+      native_target::init();
       std::vector< boost::shared_ptr< TemporaryFile > > bc_file_names( std::distance( begin, end ) );
       typename std::vector< boost::shared_ptr< TemporaryFile > >::iterator bc_iter;
       Iterator src_iter;

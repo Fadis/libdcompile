@@ -165,15 +165,6 @@ namespace dcompile {
     TemporaryFile bc_file_name( 64, ".bc" );
     clang::CompilerInstance compiler; 
     setupCompiler( compiler, source_file_name.getPath(), bc_file_name.getPath() );
-    compiler.createFileManager();
-    const clang::FileEntry *ram_file = compiler.getFileManager().getVirtualFile ( "/foo", source_code.size(), 10 );
-    std::cout << ram_file << std::endl;
-    std::string error;
-    std::cout << compiler.getFileManager().getFile(
-                                                            "/foo"
-                                                            ) << std::endl;
-    std::cout << error << std::endl;
-      //->getBuffer() = llvm::StringRef( source_code );
     {
       std::fstream source_file( source_file_name.getPath().c_str(), std::ios::out );
       source_file << source_code;
@@ -264,9 +255,9 @@ namespace dcompile {
     return std::string( std::istreambuf_iterator<char>(asm_file), std::istreambuf_iterator<char>() );
   }
   module dynamic_compiler::getModule( clang::CompilerInstance &compiler, TemporaryFile &bc_file_name ) const {
+    native_target::init();
     clang::EmitBCAction action( getContext().get() );
     execute ( compiler, action );
-    native_target::init();
     llvm::SMDiagnostic Err;
     llvm::Module *llvm_module = llvm::ParseIRFile( bc_file_name.getPath().c_str(), Err, *getContext() );
     std::string ErrorMsg;

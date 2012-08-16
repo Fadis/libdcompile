@@ -42,8 +42,6 @@ int main() {
   "  a[ 0 ] = hoge();"
   "}";
   dcompile::dynamic_compiler dc;
-//  dc.getLoader().enableSystemPath();
-//  dc.getHeaderPath().enableSystemPath();
   std::cout << dc.dumpAsm( source_code, dcompile::CXX ) << std::endl;
   dcompile::module lib = dc( source_code, dcompile::CXX );
   boost::optional< dcompile::function > foo = lib.getFunction( "foo" );

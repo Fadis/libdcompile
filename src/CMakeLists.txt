@@ -8,7 +8,7 @@ set_target_properties( dcompile  PROPERTIES
 	  SOVERSION 0.0.1
 	)
 ADD_EXECUTABLE( sample1 sample1.cpp )
-target_link_libraries( sample1 dcompile )
+target_link_libraries( sample1 ${Boost_LIBRARIES} dcompile )
 ADD_EXECUTABLE( sample2 sample2.cpp )
 target_link_libraries( sample2 dcompile )
 ADD_EXECUTABLE( sample3 sample3.cpp )
@@ -17,6 +17,10 @@ ADD_EXECUTABLE( sample4 sample4.cpp )
 target_link_libraries( sample4 dcompile )
 ADD_EXECUTABLE( sample5 sample5.cpp )
 target_link_libraries( sample5 dcompile )
+ADD_EXECUTABLE( sample6 sample6.cpp )
+target_link_libraries( sample6 dcompile )
+ADD_EXECUTABLE( sample_kernelvm sample_kernelvm.cpp )
+target_link_libraries( sample_kernelvm dcompile )
 install( TARGETS dcompile
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
