@@ -30,16 +30,8 @@
 
 #include <dcompile/dcompile.hpp>
 
-dcompile::dynamic_compiler dc;
-void init() {
-  dc.getLoader().enableSystemPath();
-  dc.getHeaderPath().enableSystemPath();
-  dc.getHeaderPath().addPath( "/Users/matsubayashinaomasa/git/dcompile/include/" );
-  dc.getHeaderPath().addPath( "/Users/matsubayashinaomasa/opt/llvm/include/" );
-}
-
 void eval( int *count, const char *str ) {
-  std::cout << dc.dumpLLVM( str, dcompile::CXX ) << std::endl;
+  dcompile::dynamic_compiler dc;
   boost::optional< dcompile::module > lib = dc( str, dcompile::CXX );
   if( lib ) {
     boost::optional< dcompile::function > foo = lib->getFunction( "foo" );
@@ -47,10 +39,8 @@ void eval( int *count, const char *str ) {
       (*foo)( count, str );
   }
 }
-
 int main() {
   int count = 5;
-
   std::string source_code = 
   "void eval( int *, const char * );"
   "extern \"C\" void foo( int *count, const char *str ) {"
@@ -58,7 +48,6 @@ int main() {
   "  if( *count )"
   "    eval( count, str );"
   "}";
-  init();
   eval( &count, source_code.c_str() );
   std::cout << count << std::endl;
 }
